@@ -27,7 +27,17 @@ Rectangle {
     readonly property bool freeform: board.freeform
     property string containerId: ""
     property string containerTitle: ""
-    property int cardWidth: 230
+    // Shared by every board and remembered between runs.
+    readonly property int cardWidth: Theme.cardWidth
+    function setCardWidth(w) { Theme.cardWidth = Math.round(Math.max(170, Math.min(360, w))); }
+    // Ctrl+scroll: one size step per notch (touchpads add up).
+    property real wheelAcc: 0
+    function zoomWheel(e) {
+        wheelAcc += e.angleDelta.y;
+        while (wheelAcc >= 120) { setCardWidth(cardWidth + 20); wheelAcc -= 120; }
+        while (wheelAcc <= -120) { setCardWidth(cardWidth - 20); wheelAcc += 120; }
+        e.accepted = true;
+    }
     readonly property real cardHeight: cardWidth * 0.66
     signal openRequested(string id)
     signal selectRequested(string id)
@@ -120,10 +130,28 @@ Rectangle {
     function toView(u) { return margin + u * unit; }
     function toUnits(px) { return Math.max(0, (px - margin) / unit); }
     // The card or note at a point of the freeform view's content, or "".
-    function idAtBoard(px, py) {
+    // `skip`: an id to look through (the card being dragged).
+    function idAtBoard(px, py, skip) {
         const x = toUnits(px), y = toUnits(py);
-        const hit = freeOrder.slice().reverse().find(it => { const p = spots[it.id]; return p && x >= p.x && x <= p.x + baseW && y >= p.y && y <= p.y + baseH; });
+        const hit = freeOrder.slice().reverse().find(it => { const p = spots[it.id]; return it.id !== skip && p && x >= p.x && x <= p.x + baseW && y >= p.y && y <= p.y + baseH; });
         return hit ? hit.id : "";
+    }
+    // Freeform: while a card is dragged over the middle of a folder card,
+    // that folder (dropping moves the card into it, as on the grid).
+    property string freeDropFolder: ""
+    function updateFreeDrag(id, scenePos) {
+        const p = freeContent.mapFromItem(null, scenePos.x, scenePos.y);
+        const under = idAtBoard(p.x, p.y, id);
+        const card = under ? cards.find(c => c.id === under) : null;
+        const fx = card ? (toUnits(p.x) - spots[under].x) / baseW : 0;
+        freeDropFolder = card && card.kind === "folder" && fx > 0.3 && fx < 0.7 ? under : "";
+    }
+    // Drop a dragged freeform card at its spot, or into a folder card.
+    function finishFreeDrag(id, px, py) {
+        const folder = freeDropFolder;
+        freeDropFolder = "";
+        if (folder) return Api.call("dropOn", id, folder, "inside") !== undefined;
+        return placeAt(id, px, py);
     }
     function placeAt(id, px, py) { return Api.call("placeOnBoard", containerId, id, toUnits(px), toUnits(py)) !== undefined; }
     // Add a note; in freeform at (x, y) units, else (or with no spot) in the
@@ -390,7 +418,7 @@ Rectangle {
                     onClicked: arrangeMenu.popup(arrangeButton, 0, arrangeButton.height)
                 }
                 Label { visible: cb.width > 760; text: qsTr("Card size"); color: cb.boardText }
-                Slider { visible: cb.width > 640; from: 170; to: 360; value: cb.cardWidth; onMoved: cb.cardWidth = value; Layout.preferredWidth: 110; focusPolicy: Qt.NoFocus }
+                Slider { visible: cb.width > 640; from: 170; to: 360; value: cb.cardWidth; onMoved: cb.setCardWidth(value); Layout.preferredWidth: 110; focusPolicy: Qt.NoFocus }
                 Button {
                     text: qsTr("+ Card")
                     enabled: cb.containerId !== ""
@@ -435,6 +463,7 @@ Rectangle {
             ScrollBar.vertical: ScrollBar {}
             activeFocusOnTab: !cb.freeform
             Keys.onPressed: (e) => { if (cb.handleKey(e)) e.accepted = true; }
+            WheelHandler { acceptedModifiers: Qt.ControlModifier; onWheel: (e) => cb.zoomWheel(e) }
             // Shows that the keys go to the board.
             Rectangle {
                 anchors.fill: parent
@@ -492,6 +521,7 @@ Rectangle {
                     freeView.contentX = Math.max(0, Math.min(freeView.contentWidth - freeView.width, freeView.contentX - dx));
                 }
             }
+            WheelHandler { acceptedModifiers: Qt.ControlModifier; onWheel: (e) => cb.zoomWheel(e) }
             WheelHandler {
                 acceptedModifiers: Qt.ShiftModifier
                 onWheel: (e) => freeView.contentX = Math.max(0, Math.min(freeView.contentWidth - freeView.width, freeView.contentX - e.angleDelta.y / 2))
@@ -687,11 +717,16 @@ Rectangle {
             onActiveChanged: {
                 if (face.mover) {
                     if (active) { cb.keyId = face.modelData.id; return; }
-                    cb.placeAt(face.modelData.id, face.mover.x, face.mover.y);
+                    if (face.isNote) cb.placeAt(face.modelData.id, face.mover.x, face.mover.y);
+                    else cb.finishFreeDrag(face.modelData.id, face.mover.x, face.mover.y);
                 } else if (active) cb.startDrag(face.modelData.id, face.modelData.title);
                 else cb.finishDrag();
             }
-            onCentroidChanged: if (active && !face.mover) cb.updateDrag(centroid.scenePosition)
+            onCentroidChanged: {
+                if (!active) return;
+                if (!face.mover) cb.updateDrag(centroid.scenePosition);
+                else if (!face.isNote) cb.updateFreeDrag(face.modelData.id, centroid.scenePosition);
+            }
         }
         // The keyboard highlight.
         Rectangle {
@@ -706,7 +741,8 @@ Rectangle {
         // "Drop inside this folder" highlight.
         Rectangle {
             anchors.fill: parent
-            visible: !face.mover && cb.dropMode === "inside" && cb.dropIndex === face.cardIndex
+            visible: face.mover ? cb.freeDropFolder === face.modelData.id
+                                : cb.dropMode === "inside" && cb.dropIndex === face.cardIndex
             color: "transparent"
             border.width: 3
             border.color: Theme.accent

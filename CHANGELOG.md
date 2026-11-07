@@ -8,7 +8,9 @@ Notable changes to Wordloom. Each entry lands in the same commit as the change i
 - **Freeform corkboards.** Switch a board from *Grid* to *Freeform* and cards stay wherever you
   drop them, without changing the binder. *Arrange ▾* ▸ *Tidy Up* puts them back in slots and
   *Order Binder by Board* reorders the folder to match the board (rows, left to right). Ctrl+arrows
-  nudge the highlighted card.
+  nudge the highlighted card. Dropping a card on the middle of a folder card moves it into the
+  folder, as on the grid.
+- Ctrl+scroll on the corkboard resizes the cards, and the card size is now remembered between runs.
 - **Corkboard notes.** *+ Note* (or double-click a freeform board) pins a sticky note that lives
   only on that board, not in the binder, with a title, text and one of five colours. *Make into
   Document* turns a note into a binder item in the same spot.

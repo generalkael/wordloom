@@ -505,6 +505,30 @@ Item {
             c.setFreeform(false);
             check(!c.freeform, "the board goes back to a grid");
         }],
+        ["freeform into folder", () => {
+            ws().select(Api.call("rootId", "manuscript"), "corkboard");
+            ws().corkboardRef().setFreeform(true);
+        }],
+        ["freeform into folder", () => {
+            const c = ws().corkboardRef(), ret = rowId("The Return");
+            const iRet = c.items.findIndex(x => x.id === ret), iStorm = c.items.findIndex(x => x.title === "The Storm");
+            const from = c.cardGrip(iRet), to = c.cardPoint(iStorm, 0.5);
+            check(from !== null && to !== null, "the folder cards are on the board");
+            if (from && to) input.drag(win, from, to);
+        }],
+        ["freeform into folder", () => {
+            const c = ws().corkboardRef(), ret = rowId("The Return");
+            check(Api.get("children", [], rowId("The Storm")).some(x => x.id === ret) && c.freeDropFolder === "",
+                  "dropping a card on the middle of a folder card moves it into the folder");
+            Api.call("undo");
+            check(c.cards.some(x => x.id === ret), "Undo brings it back");
+            const w = c.cardWidth;
+            c.zoomWheel({ angleDelta: { y: 120 }, accepted: false });
+            check(c.cardWidth === w + 20 && Theme.cardWidth === w + 20, "Ctrl+scroll makes the cards bigger (" + w + " → " + c.cardWidth + ")");
+            c.zoomWheel({ angleDelta: { y: -120 }, accepted: false });
+            check(c.cardWidth === w, "and smaller again");
+            c.setFreeform(false);
+        }],
         ["outliner", () => {
             Api.call("setField", rowId("Arrival"), "field:POV", "Mara");
             ws().select(Api.call("rootId", "manuscript"), "outliner");

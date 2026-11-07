@@ -51,6 +51,8 @@ QtObject {
     function zoomOut() { const z = zoomSteps.slice().reverse().find(s => s < editorZoom - 0.001); setZoom(z === undefined ? minZoom : z); }
     function resetZoom() { editorZoom = 1.0; }
     readonly property string zoomText: Math.round(editorZoom * 100) + "%"
+    // Corkboard card width (the Card size slider, Ctrl+scroll on a board).
+    property int cardWidth: 230
     // Show Markdown styling (bold, headings, quotes…) while editing.
     property bool styledMarkdown: true
     // Underline misspelled words in the editor.
@@ -75,6 +77,7 @@ QtObject {
         property alias pageWidth: theme.pageWidth
         property alias lineHeight: theme.lineHeight
         property alias editorZoom: theme.editorZoom
+        property alias cardWidth: theme.cardWidth
         property alias styledMarkdown: theme.styledMarkdown
         property alias spellCheck: theme.spellCheck
         property alias spellLanguage: theme.spellLanguage
