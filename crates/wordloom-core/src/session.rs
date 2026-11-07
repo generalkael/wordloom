@@ -1379,12 +1379,38 @@ impl Session {
             "freeform": b.is_some_and(|b| b.freeform),
             "positions": positions,
             "notes": b.map(|b| b.notes.clone()).unwrap_or_default(),
-            "color": p.boards.color,
+            // What the board shows; its own colour; the project's.
+            "color": p.boards.color_of(cid),
+            "own_color": b.and_then(|b| b.color.clone()),
+            "default_color": p.boards.color,
         }))
     }
 
-    pub fn set_board_color(&mut self, color: &str) -> Result<()> {
-        self.project.boards.set_color(color)?;
+    /// One board's colour ("" = the project's colour).
+    pub fn set_board_color(&mut self, container: &str, color: &str) -> Result<()> {
+        let cid = parse_id(container)?;
+        self.project.node(cid)?;
+        self.project.boards.set_board_color(cid, color)?;
+        self.changed();
+        Ok(())
+    }
+
+    /// Every board's colour: the project's, with boards' own colours dropped
+    /// ("" = the theme's cork).
+    pub fn set_all_boards_color(&mut self, color: &str) -> Result<()> {
+        self.project.boards.set_color(color, true)?;
+        self.changed();
+        Ok(())
+    }
+
+    /// Reorder a note among its board's notes, or move it to the board of
+    /// another item (`to`) at position `index`.
+    pub fn move_board_note(&mut self, from: &str, note: &str, to: &str, index: i64) -> Result<()> {
+        let (from, note, to) = (parse_id(from)?, parse_id(note)?, parse_id(to)?);
+        self.project.node(to)?;
+        self.project
+            .boards
+            .relocate_note(from, note, to, index.max(0) as usize)?;
         self.changed();
         Ok(())
     }

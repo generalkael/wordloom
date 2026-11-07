@@ -43,11 +43,13 @@ Rectangle {
     signal selectRequested(string id)
 
     // ---- colours ----
-    readonly property color boardColor: board.color ? board.color : Theme.cork
+    // A colour value from the core: "#rrggbb", "cork" (the theme's) or null.
+    function colorFor(c) { return c && c !== "cork" ? c : Theme.cork; }
+    readonly property color boardColor: colorFor(board.color)
     readonly property bool boardIsLight: (0.299 * boardColor.r + 0.587 * boardColor.g + 0.114 * boardColor.b) > 0.5
     readonly property color boardText: boardIsLight ? "#3b2b17" : "#f1ece4"
     readonly property var boardColors: [
-        { name: qsTr("Cork"), c: "" }, { name: qsTr("Walnut"), c: "#7a5a3a" }, { name: qsTr("Slate"), c: "#5b6770" },
+        { name: qsTr("Cork"), c: "cork" }, { name: qsTr("Walnut"), c: "#7a5a3a" }, { name: qsTr("Slate"), c: "#5b6770" },
         { name: qsTr("Felt Green"), c: "#3f6b4e" }, { name: qsTr("Navy"), c: "#2f4566" }, { name: qsTr("Burgundy"), c: "#6e3240" },
         { name: qsTr("Linen"), c: "#e8e1d3" }, { name: qsTr("Whiteboard"), c: "#f4f5f2" }
     ]
@@ -59,7 +61,10 @@ Rectangle {
         { id: "white", name: qsTr("White"), light: "#ffffff", dark: "#3a3c40" }
     ]
     function noteColor(id) { const c = noteColors.find(n => n.id === id) || noteColors[0]; return Theme.dark ? c.dark : c.light; }
-    function setBoardColor(c) { Api.call("setBoardColor", c); }
+    // This board's own colour ("" = the same as other boards).
+    function setBoardColor(c) { Api.call("setBoardColor", containerId, c); }
+    // This board's colour on every board (and as the default for new ones).
+    function useColorEverywhere() { Api.call("setAllBoardsColor", board.color || ""); }
     // "#rrggbb" (no alpha) for a colour.
     function hex(c) { const h = (v) => ("0" + Math.round(v * 255).toString(16)).slice(-2); return "#" + h(c.r) + h(c.g) + h(c.b); }
 
@@ -146,10 +151,13 @@ Rectangle {
         const fx = card ? (toUnits(p.x) - spots[under].x) / baseW : 0;
         freeDropFolder = card && card.kind === "folder" && fx > 0.3 && fx < 0.7 ? under : "";
     }
-    // Drop a dragged freeform card at its spot, or into a folder card.
+    // Drop a dragged freeform card at its spot, or into a folder card (a
+    // note goes to that folder's board).
     function finishFreeDrag(id, px, py) {
         const folder = freeDropFolder;
         freeDropFolder = "";
+        const note = !cards.some(c => c.id === id);
+        if (folder && note) return Api.call("moveBoardNote", containerId, id, folder, 1e6) !== undefined;
         if (folder) return Api.call("dropOn", id, folder, "inside") !== undefined;
         return placeAt(id, px, py);
     }
@@ -196,11 +204,29 @@ Rectangle {
     property string dropMode: ""             // "before", "after", "inside" or "" (no move)
     function startDrag(id, title) { dragId = id; dragTitle = title; dropIndex = -1; dropMode = ""; }
     // `scenePos`: the pointer in window coordinates.
+    // Notes come after the cards and are dragged among the notes; a note
+    // dropped on the middle of a folder card goes to that folder's board.
+    readonly property bool draggingNote: dragId !== "" && !cards.some(c => c.id === dragId)
     function updateDrag(scenePos) {
         dragPos = cb.mapFromItem(null, scenePos.x, scenePos.y);
         const p = grid.contentItem.mapFromItem(null, scenePos.x, scenePos.y);
         let i = grid.indexAt(p.x, p.y);
         let mode = "";
+        if (draggingNote) {
+            const first = cards.length;
+            const item = i >= 0 ? grid.itemAtIndex(i) : null;
+            const fx = item ? (p.x - item.x) / item.width : 0.5;
+            if (i >= 0 && i < first) {
+                if (cards[i].kind === "folder" && fx > 0.3 && fx < 0.7) mode = "inside";
+                else { i = first; mode = "before"; }   // over a card: the start of the notes
+            } else if (i >= first) mode = fx < 0.5 ? "before" : "after";
+            else if (p.y >= 0) { i = items.length - 1; mode = "after"; }
+            const from = items.findIndex(c => c.id === dragId);
+            if (mode !== "inside" && (i === from || (mode === "after" && i === from - 1) || (mode === "before" && i === from + 1))) mode = "";
+            dropIndex = i;
+            dropMode = mode;
+            return;
+        }
         if (i < 0 || i >= cards.length) {
             // Past the last card (or over a note): drop at the end.
             if (cards.length && (i >= cards.length || p.y >= 0)) { i = cards.length - 1; mode = "after"; }
@@ -314,6 +340,16 @@ Rectangle {
     function cardPoint(i, fx) { const it = i >= 0 && i < items.length ? cardItem(items[i].id) : null; return it ? it.mapToItem(null, it.width * fx, it.height / 2) : null; }
     // Returns true if the card moved.
     function finishDrag() {
+        if (draggingNote) {
+            const id = dragId, mode = dropMode, at = dropIndex;
+            dragId = ""; dropIndex = -1; dropMode = "";
+            if (!mode || at < 0) return false;
+            if (mode === "inside") return Api.call("moveBoardNote", containerId, id, cards[at].id, 1e6) !== undefined;
+            const from = items.findIndex(c => c.id === id) - cards.length;
+            let to = at - cards.length + (mode === "after" ? 1 : 0);
+            if (from < to) --to;   // its own place closes up first
+            return Api.call("moveBoardNote", containerId, id, containerId, Math.max(0, to)) !== undefined;
+        }
         const id = dragId, mode = dropMode, target = dropIndex >= 0 && dropIndex < cards.length ? cards[dropIndex].id : "";
         dragId = ""; dropIndex = -1; dropMode = "";
         if (!id || !mode || !target) return false;
@@ -335,22 +371,37 @@ Rectangle {
     }
     Menu {
         id: colorMenu
+        // Presets and a custom colour set this board; "Same as Other Boards"
+        // follows the project's colour; the last item copies this board's
+        // colour to every board.
+        MenuItem {
+            text: qsTr("Same as Other Boards")
+            checkable: true
+            checked: !cb.board.own_color
+            indicator: Rectangle {
+                x: 8; anchors.verticalCenter: parent.verticalCenter; width: 14; height: 14; radius: 3
+                color: cb.colorFor(cb.board.default_color); border.color: Theme.border; border.width: parent.checked ? 2 : 1
+            }
+            onTriggered: cb.setBoardColor("")
+        }
+        MenuSeparator {}
         Repeater {
             model: cb.boardColors
             delegate: MenuItem {
                 required property var modelData
                 text: modelData.name
                 checkable: true
-                checked: (cb.board.color || "") === modelData.c
+                checked: cb.board.own_color === modelData.c
                 indicator: Rectangle {
                     x: 8; anchors.verticalCenter: parent.verticalCenter; width: 14; height: 14; radius: 3
-                    color: modelData.c || Theme.cork; border.color: Theme.border; border.width: parent.checked ? 2 : 1
+                    color: cb.colorFor(modelData.c); border.color: Theme.border; border.width: parent.checked ? 2 : 1
                 }
                 onTriggered: cb.setBoardColor(modelData.c)
             }
         }
-        MenuSeparator {}
         MenuItem { text: qsTr("Custom Colour…"); onTriggered: { boardColorDialog.selectedColor = cb.boardColor; boardColorDialog.open(); } }
+        MenuSeparator {}
+        MenuItem { text: qsTr("Use This Colour on All Boards"); onTriggered: cb.useColorEverywhere() }
     }
     Menu {
         id: arrangeMenu
@@ -585,8 +636,9 @@ Rectangle {
         }
     }
 
-    // A card or a note. In the grid, dragging reorders (cards only); on a
-    // freeform board it moves `mover`, and dropping saves the spot.
+    // A card or a note. In the grid, dragging reorders (cards among cards in
+    // the binder, notes among notes); on a freeform board it moves `mover`,
+    // and dropping saves the spot.
     component CardFace: Rectangle {
         id: face
         required property var modelData
@@ -705,11 +757,10 @@ Rectangle {
         TapHandler { acceptedButtons: Qt.RightButton; onTapped: { cb.keyId = face.modelData.id; (face.isNote ? noteMenu : cardMenu).popup(); } }
         // Drag from anywhere that isn't text (the edges, the ruled area,
         // the footer, the icon); the title and text keep the mouse for
-        // selecting text. On a grid only cards move (in the binder).
+        // selecting text.
         DragHandler {
             id: dragger
             target: face.mover
-            enabled: face.mover !== null || !face.isNote
             acceptedButtons: Qt.LeftButton
             cursorShape: active ? Qt.ClosedHandCursor : Qt.ArrowCursor
             xAxis.minimum: 0
@@ -717,15 +768,14 @@ Rectangle {
             onActiveChanged: {
                 if (face.mover) {
                     if (active) { cb.keyId = face.modelData.id; return; }
-                    if (face.isNote) cb.placeAt(face.modelData.id, face.mover.x, face.mover.y);
-                    else cb.finishFreeDrag(face.modelData.id, face.mover.x, face.mover.y);
-                } else if (active) cb.startDrag(face.modelData.id, face.modelData.title);
+                    cb.finishFreeDrag(face.modelData.id, face.mover.x, face.mover.y);
+                } else if (active) cb.startDrag(face.modelData.id, face.modelData.title || (face.isNote ? (face.modelData.text.split("\n")[0] || qsTr("Note")) : ""));
                 else cb.finishDrag();
             }
             onCentroidChanged: {
                 if (!active) return;
                 if (!face.mover) cb.updateDrag(centroid.scenePosition);
-                else if (!face.isNote) cb.updateFreeDrag(face.modelData.id, centroid.scenePosition);
+                else cb.updateFreeDrag(face.modelData.id, centroid.scenePosition);
             }
         }
         // The keyboard highlight.

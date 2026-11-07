@@ -197,6 +197,8 @@ fn undo_label(method: &str, a: &Args) -> Option<(String, Option<String>)> {
             return Some(("Edit Note".into(), Some(format!("note:{}", a.str(1)))));
         }
         "setBoardColor" => "Corkboard Colour",
+        "setAllBoardsColor" => "Colour of All Corkboards",
+        "moveBoardNote" => "Move Note",
         "tidyBoard" => "Tidy Up Corkboard",
         "orderChildren" => "Order by Corkboard",
         "addBoardNote" => "Add Note",
@@ -549,7 +551,14 @@ impl App {
             "placeOnMap" => unit(self.s()?.place_on_map(a.str(0), a.float(1), a.float(2)))?,
             // --- corkboard ---
             "board" => self.s()?.board(a.str(0))?,
-            "setBoardColor" => unit(self.s()?.set_board_color(a.str(0)))?,
+            "setBoardColor" => unit(self.s()?.set_board_color(a.str(0), a.str(1)))?,
+            "setAllBoardsColor" => unit(self.s()?.set_all_boards_color(a.str(0)))?,
+            "moveBoardNote" => {
+                unit(
+                    self.s()?
+                        .move_board_note(a.str(0), a.str(1), a.str(2), a.int(3)),
+                )?
+            }
             "setBoardFreeform" => unit(self.s()?.set_board_freeform(a.str(0), a.bool(1)))?,
             "placeOnBoard" => {
                 unit(
@@ -767,14 +776,31 @@ mod tests {
 
         ok(&app.call("tidyBoard", &json!([ms]).to_string()));
         assert!(board(&mut app)["positions"].as_object().unwrap().is_empty());
-        ok(&app.call("setBoardColor", r##"["#3B5A40"]"##));
+        ok(&app.call("setBoardColor", &json!([ms, "#3B5A40"]).to_string()));
         assert_eq!(board(&mut app)["color"], "#3b5a40");
+        let other = ok(&app.call("board", &json!([a]).to_string()));
+        assert_eq!(other["color"], Value::Null, "other boards keep the default");
         assert!(app
-            .call("setBoardColor", r#"["green"]"#)
+            .call("setBoardColor", &json!([ms, "green"]).to_string())
             .json
             .contains("not a colour"));
         assert_eq!(ok(&app.call("undo", "")), "Corkboard Colour");
         assert_eq!(board(&mut app)["color"], Value::Null);
+        ok(&app.call("setBoardColor", &json!([ms, "#123456"]).to_string()));
+        ok(&app.call("setAllBoardsColor", r##"["#654321"]"##));
+        assert_eq!(board(&mut app)["color"], "#654321");
+        assert_eq!(board(&mut app)["own_color"], Value::Null);
+        let other = ok(&app.call("board", &json!([a]).to_string()));
+        assert_eq!(other["color"], "#654321");
+
+        // A note moves to another folder's board.
+        let n = ok(&app.call("addBoardNote", &json!([ms, 0, 0, "move me"]).to_string()));
+        ok(&app.call("moveBoardNote", &json!([ms, n, a, 0]).to_string()));
+        let other = ok(&app.call("board", &json!([a]).to_string()));
+        assert_eq!(other["notes"][0]["text"], "move me");
+        assert_eq!(ok(&app.call("undo", "")), "Move Note");
+        // Back after the note restored earlier.
+        assert_eq!(board(&mut app)["notes"][1]["text"], "move me");
     }
 
     #[test]

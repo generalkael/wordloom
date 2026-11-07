@@ -236,7 +236,7 @@ ApplicationWindow {
                         Api.call("updateBoardNote", ms, n, "Idea", "What if the keeper's log was never his? Check the handwriting.");
                         Api.call("colorBoardNote", ms, n, "yellow");
                         const n2 = Api.call("addBoardNote", ms, 300, 520, "Research: Fresnel lens rotation speed");
-                        if (n2) Api.call("colorBoardNote", ms, n2, "blue");
+                        if (n2) { Api.call("colorBoardNote", ms, n2, "blue"); Api.call("updateBoardNote", ms, n2, "Research", "Fresnel lens rotation speed, and how long a lamp burns on one filling"); }
                         if (kids.length > 1) Api.call("placeOnBoard", ms, kids[kids.length - 1].id, 40, 330);
                     }
                 }

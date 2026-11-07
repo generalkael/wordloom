@@ -13,9 +13,11 @@ Notable changes to Wordloom. Each entry lands in the same commit as the change i
 - Ctrl+scroll on the corkboard resizes the cards, and the card size is now remembered between runs.
 - **Corkboard notes.** *+ Note* (or double-click a freeform board) pins a sticky note that lives
   only on that board, not in the binder, with a title, text and one of five colours. *Make into
-  Document* turns a note into a binder item in the same spot.
-- **Corkboard colour.** The swatch on the board's bar picks Cork, Walnut, Slate, Felt Green, Navy,
-  Burgundy, Linen, Whiteboard or a custom colour for the project's boards.
+  Document* turns a note into a binder item in the same spot. Drag a note among the notes on a grid,
+  anywhere on a freeform board, or onto a folder card to send it to that folder's board.
+- **Corkboard colours.** The swatch on the board's bar gives a board Cork, Walnut, Slate, Felt Green,
+  Navy, Burgundy, Linen, Whiteboard or a custom colour. Boards without their own colour use the
+  project's; *Use This Colour on All Boards* sets it everywhere.
 - **Editor font & spacing.** *Aa* on the editor bar (View ▸ Editor Font & Spacing…) chooses the
   writing font from the installed fonts, its size and the line spacing, with a live sample.
 - **Editor zoom.** 50–300% from the % button, Ctrl+= / Ctrl+− / Ctrl+0 or Ctrl+scroll, separate from

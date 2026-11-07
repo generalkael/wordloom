@@ -500,6 +500,10 @@ Item {
             check(c.board.notes.length === 0, "Delete removes a highlighted note");
             c.setBoardColor("#3f6b4e");
             check(Qt.colorEqual(c.color, "#3f6b4e") && !c.boardIsLight, "the board takes the chosen colour (" + c.color + ")");
+            check(Api.get("board", null, rowId("The Log")).color === null, "only this board (" + JSON.stringify(Api.get("board", null, rowId("The Log")).color) + ")");
+            c.useColorEverywhere();
+            check(Api.get("board", null, rowId("The Log")).color === "#3f6b4e", "Use This Colour on All Boards sets the others");
+            Api.call("undo");
             Api.call("undo");
             check(Qt.colorEqual(c.color, Theme.cork), "Undo brings back the cork colour");
             c.setFreeform(false);
@@ -528,6 +532,39 @@ Item {
             c.zoomWheel({ angleDelta: { y: -120 }, accepted: false });
             check(c.cardWidth === w, "and smaller again");
             c.setFreeform(false);
+        }],
+        ["grid notes", () => {
+            ws().select(rowId("The Storm"), "corkboard");
+            const c = ws().corkboardRef(), sid = rowId("The Storm");
+            for (const t of ["one", "two"]) Api.call("addBoardNote", sid, 0, 0, t);
+        }],
+        ["grid notes", () => {
+            const c = ws().corkboardRef(), texts = () => c.board.notes.map(n => n.text).join(",");
+            check(!c.freeform && texts() === "one,two", "the notes follow the cards on a grid (" + texts() + ")");
+            const iTwo = c.items.findIndex(x => x.text === "two"), iOne = iTwo - 1;
+            const from = c.cardGrip(iTwo), to = c.cardPoint(iOne, 0.2);
+            if (from && to) input.drag(win, from, to);
+        }],
+        ["grid notes", () => {
+            const c = ws().corkboardRef(), texts = () => c.board.notes.map(n => n.text).join(",");
+            check(texts() === "two,one", "a note dragged on the grid moves among the notes (" + texts() + ")");
+            check(c.cards.map(x => x.title).join(",") === "Arrival,The Keeper", "and the cards stay put");
+            // Onto a folder card: the note goes to that folder's board.
+            const ms = Api.call("rootId", "manuscript"), two = c.board.notes[0].id;
+            ws().select(ms, "corkboard");
+            Api.call("moveBoardNote", rowId("The Storm"), two, ms, 0);
+        }],
+        ["grid notes", () => {
+            const c = ws().corkboardRef();
+            const iNote = c.items.findIndex(x => x.text === "two"), iLog = c.items.findIndex(x => x.title === "The Log");
+            c.startDrag(c.items[iNote].id, "two");
+            c.updateDrag(c.cardPoint(iLog, 0.5));
+            check(c.dropMode === "inside", "a note over the middle of a folder card drops into it (" + c.dropMode + ")");
+            c.finishDrag();
+            check(Api.get("board", null, rowId("The Log")).notes.some(n => n.text === "two") && !c.items.some(x => x.text === "two"),
+                  "and moves to that folder's board");
+            for (const id of [rowId("The Log"), rowId("The Storm")])
+                for (const n of Api.get("board", null, id).notes) Api.call("removeBoardNote", id, n.id);
         }],
         ["outliner", () => {
             Api.call("setField", rowId("Arrival"), "field:POV", "Mara");

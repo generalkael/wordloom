@@ -3,9 +3,9 @@
 //! Every folder's corkboard is a grid of its children in binder order by
 //! default. A board can instead be *freeform*: cards sit wherever the user
 //! drops them, without changing the binder (the view can reorder the
-//! binder to match). A board can also hold *notes*,
-//! sticky cards that live only on that board and are not binder items. The
-//! project has one corkboard colour.
+//! binder to match). A board can also hold *notes*, sticky cards that live
+//! only on that board and are not binder items. Each board can have its own
+//! colour; the project's colour is the default for the rest.
 
 use std::collections::BTreeMap;
 
@@ -50,17 +50,21 @@ pub struct Board {
     pub positions: BTreeMap<NodeId, [f64; 2]>,
     #[serde(default)]
     pub notes: Vec<BoardNote>,
+    /// `#rrggbb` for this board, or None for the project's colour.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub color: Option<String>,
 }
 
 impl Board {
     fn is_empty(&self) -> bool {
-        !self.freeform && self.positions.is_empty() && self.notes.is_empty()
+        !self.freeform && self.positions.is_empty() && self.notes.is_empty() && self.color.is_none()
     }
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Default)]
 pub struct Boards {
-    /// `#rrggbb`, or None for the theme's cork colour.
+    /// `#rrggbb` for boards without their own colour, or None for the
+    /// theme's cork colour.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub color: Option<String>,
     /// Keyed by the folder whose children the board shows.
@@ -96,6 +100,22 @@ pub fn normalize_color(c: &str) -> Option<String> {
     }
 }
 
+/// The theme's cork colour (light or dark), chosen on purpose: a board can
+/// pick it while the project's colour is something else.
+pub const CORK: &str = "cork";
+
+fn parse_color(color: &str) -> Result<Option<String>> {
+    if color.trim().is_empty() {
+        return Ok(None);
+    }
+    if color.trim().eq_ignore_ascii_case(CORK) {
+        return Ok(Some(CORK.to_string()));
+    }
+    normalize_color(color)
+        .map(Some)
+        .ok_or_else(|| Error::Invalid(format!("not a colour: {color}")))
+}
+
 impl Boards {
     pub fn board(&self, container: NodeId) -> Option<&Board> {
         self.boards.get(&container)
@@ -112,16 +132,32 @@ impl Boards {
         }
     }
 
-    /// "" goes back to the theme's colour.
-    pub fn set_color(&mut self, color: &str) -> Result<()> {
-        self.color = if color.trim().is_empty() {
-            None
-        } else {
-            Some(
-                normalize_color(color)
-                    .ok_or_else(|| Error::Invalid(format!("not a colour: {color}")))?,
-            )
-        };
+    /// The colour a board shows: its own, else the project's (None: cork).
+    pub fn color_of(&self, container: NodeId) -> Option<&str> {
+        self.boards
+            .get(&container)
+            .and_then(|b| b.color.as_deref())
+            .or(self.color.as_deref())
+    }
+
+    /// The project's colour, for boards without their own. "" goes back to
+    /// the theme's colour. With `everywhere`, boards drop their own colours.
+    pub fn set_color(&mut self, color: &str, everywhere: bool) -> Result<()> {
+        // Cork is what the project shows with no colour.
+        self.color = parse_color(color)?.filter(|c| c != CORK);
+        if everywhere {
+            for b in self.boards.values_mut() {
+                b.color = None;
+            }
+            self.boards.retain(|_, b| !b.is_empty());
+        }
+        Ok(())
+    }
+
+    /// One board's own colour; "" goes back to the project's.
+    pub fn set_board_color(&mut self, container: NodeId, color: &str) -> Result<()> {
+        self.board_mut(container).color = parse_color(color)?;
+        self.prune(container);
         Ok(())
     }
 
@@ -209,6 +245,22 @@ impl Boards {
         Ok(n)
     }
 
+    /// Move a note to position `index` among the notes of board `to` (the
+    /// same board reorders it). It keeps its spot on a freeform board.
+    pub fn relocate_note(
+        &mut self,
+        from: NodeId,
+        note: Uuid,
+        to: NodeId,
+        index: usize,
+    ) -> Result<()> {
+        let n = self.remove_note(from, note)?;
+        let notes = &mut self.board_mut(to).notes;
+        let i = index.min(notes.len());
+        notes.insert(i, n);
+        Ok(())
+    }
+
     /// Drop everything about an item that has been deleted for good: its
     /// own board (and the notes on it) and its place on other boards.
     pub fn forget_node(&mut self, node: NodeId) {
@@ -231,11 +283,66 @@ mod tests {
         assert!(normalize_color("red").is_none());
         assert!(normalize_color("#12345").is_none());
         let mut b = Boards::default();
-        b.set_color("#C9A97C").unwrap();
+        b.set_color("#C9A97C", false).unwrap();
         assert_eq!(b.color.as_deref(), Some("#c9a97c"));
-        assert!(b.set_color("blue").is_err());
-        b.set_color("").unwrap();
+        assert!(b.set_color("blue", false).is_err());
+        b.set_color("", false).unwrap();
         assert!(b.color.is_none());
+    }
+
+    #[test]
+    fn board_colours() {
+        let (one, two) = (Uuid::new_v4(), Uuid::new_v4());
+        let mut b = Boards::default();
+        assert_eq!(b.color_of(one), None);
+        b.set_color("#111111", false).unwrap();
+        b.set_board_color(one, "#222222").unwrap();
+        assert_eq!(b.color_of(one), Some("#222222"));
+        assert_eq!(b.color_of(two), Some("#111111"), "others use the project's");
+        b.set_board_color(one, "").unwrap();
+        assert_eq!(b.color_of(one), Some("#111111"));
+        assert!(
+            b.boards.is_empty(),
+            "a board with nothing of its own is dropped"
+        );
+        b.set_board_color(one, "#222222").unwrap();
+        b.set_color("#333333", true).unwrap();
+        assert_eq!(
+            b.color_of(one),
+            Some("#333333"),
+            "everywhere clears a board's own colour"
+        );
+        assert!(b.set_board_color(one, "nope").is_err());
+        b.set_board_color(two, "Cork").unwrap();
+        assert_eq!(
+            b.color_of(two),
+            Some(CORK),
+            "a board can choose cork over the project's colour"
+        );
+        b.set_color("cork", false).unwrap();
+        assert!(b.color.is_none());
+    }
+
+    #[test]
+    fn notes_move_between_boards() {
+        let (one, two) = (Uuid::new_v4(), Uuid::new_v4());
+        let mut b = Boards::default();
+        let x = b.add_note(one, 1.0, 2.0, "x").unwrap();
+        let y = b.add_note(one, 0.0, 0.0, "y").unwrap();
+        b.relocate_note(one, y, one, 0).unwrap();
+        let order: Vec<_> = b.board(one).unwrap().notes.iter().map(|n| n.id).collect();
+        assert_eq!(order, [y, x]);
+        b.relocate_note(one, x, two, 99).unwrap();
+        assert_eq!(b.board(two).unwrap().notes[0].text, "x");
+        assert_eq!(
+            (
+                b.board(two).unwrap().notes[0].x,
+                b.board(two).unwrap().notes[0].y
+            ),
+            (1.0, 2.0)
+        );
+        assert_eq!(b.board(one).unwrap().notes.len(), 1);
+        assert!(b.relocate_note(one, x, two, 0).is_err());
     }
 
     #[test]
