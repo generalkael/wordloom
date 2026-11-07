@@ -165,6 +165,7 @@ fn structure(p: &Project) -> Project {
         statuses: p.statuses.clone(),
         timeline: p.timeline.clone(),
         relations: p.relations.clone(),
+        boards: p.boards.clone(),
         stats: p.stats.clone(),
         contents: HashMap::new(),
     }
@@ -182,6 +183,7 @@ fn fingerprint(p: &Project) -> Vec<u8> {
         &p.statuses,
         &p.timeline,
         &p.relations,
+        &p.boards,
         (
             p.stats.manuscript_target,
             p.stats.session_target,
@@ -229,6 +231,20 @@ fn apply(p: &mut Project, state: Project, texts: &[TextChange], back: bool) -> P
             n.expanded = c.expanded;
             n.favorite = c.favorite;
         }
+    }
+    // Grid or freeform is a view choice, like expanding a folder: undo
+    // leaves it as it is now.
+    let containers: Vec<NodeId> = p
+        .boards
+        .boards
+        .keys()
+        .chain(current.boards.boards.keys())
+        .copied()
+        .filter(|id| p.nodes.contains_key(id))
+        .collect();
+    for id in containers {
+        let now = current.boards.board(id).is_some_and(|b| b.freeform);
+        p.boards.set_freeform(id, now);
     }
     for t in texts {
         let (expect, target) = if back {

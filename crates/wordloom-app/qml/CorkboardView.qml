@@ -1,23 +1,57 @@
 import QtQuick
 import QtQuick.Controls
+import QtQuick.Dialogs
 import QtQuick.Layouts
 import com.wordloom.app
 
 // Index cards for the children of the selected folder (or the siblings of
 // the selected document). Synopses are edited right on the card.
+//
+// A board is a grid in binder order (drag to reorder), or freeform: cards
+// stay wherever you drop them and the binder order doesn't change. Notes
+// are sticky cards that live only on the board, not in the binder; one can
+// be turned into a document. The board colour is the project's (core
+// boards.rs keeps the layouts, notes and colour).
 Rectangle {
     id: cb
-    color: Theme.cork
+    color: boardColor
 
     property string nodeId: ""
     property var node: null
     property bool active: false
-    property var cards: []
+    property var cards: []                  // binder items, in binder order
+    property var board: ({ freeform: false, positions: {}, notes: [], color: null })
+    // Everything on the board: the cards, then the notes ({note: true, …}).
+    // Set once per reload, so the cards are rebuilt once.
+    property var items: []
+    readonly property bool freeform: board.freeform
     property string containerId: ""
     property string containerTitle: ""
     property int cardWidth: 230
+    readonly property real cardHeight: cardWidth * 0.66
     signal openRequested(string id)
     signal selectRequested(string id)
+
+    // ---- colours ----
+    readonly property color boardColor: board.color ? board.color : Theme.cork
+    readonly property bool boardIsLight: (0.299 * boardColor.r + 0.587 * boardColor.g + 0.114 * boardColor.b) > 0.5
+    readonly property color boardText: boardIsLight ? "#3b2b17" : "#f1ece4"
+    readonly property var boardColors: [
+        { name: qsTr("Cork"), c: "" }, { name: qsTr("Walnut"), c: "#7a5a3a" }, { name: qsTr("Slate"), c: "#5b6770" },
+        { name: qsTr("Felt Green"), c: "#3f6b4e" }, { name: qsTr("Navy"), c: "#2f4566" }, { name: qsTr("Burgundy"), c: "#6e3240" },
+        { name: qsTr("Linen"), c: "#e8e1d3" }, { name: qsTr("Whiteboard"), c: "#f4f5f2" }
+    ]
+    readonly property var noteColors: [
+        { id: "yellow", name: qsTr("Yellow"), light: "#fff3a8", dark: "#5a5230" },
+        { id: "pink", name: qsTr("Pink"), light: "#ffd6e0", dark: "#5a3842" },
+        { id: "blue", name: qsTr("Blue"), light: "#d3e8ff", dark: "#2f4558" },
+        { id: "green", name: qsTr("Green"), light: "#d8f2cb", dark: "#34503a" },
+        { id: "white", name: qsTr("White"), light: "#ffffff", dark: "#3a3c40" }
+    ]
+    function noteColor(id) { const c = noteColors.find(n => n.id === id) || noteColors[0]; return Theme.dark ? c.dark : c.light; }
+    function setBoardColor(c) { Api.call("setBoardColor", c); }
+    // "#rrggbb" (no alpha) for a colour.
+    function hex(c) { const h = (v) => ("0" + Math.round(v * 255).toString(16)).slice(-2); return "#" + h(c.r) + h(c.g) + h(c.b); }
 
     readonly property int rev: Wordloom.revision
     onRevChanged: if (active) reload()
@@ -25,7 +59,7 @@ Rectangle {
     onNodeIdChanged: if (active) reload()
 
     function reload() {
-        if (!node) { cards = []; containerId = ""; return; }
+        if (!node) { cards = []; items = []; containerId = ""; return; }
         let cid = node.id;
         if (node.child_count === 0 && !node.is_root) {
             // A leaf: show it among its siblings.
@@ -34,9 +68,99 @@ Rectangle {
         containerId = cid || "";
         const info = containerId ? Api.get("nodeInfo", null, containerId) : null;
         containerTitle = info ? info.title : "";
-        cards = containerId ? Api.get("children", [], containerId) : [];
+        const b = containerId ? Api.get("board", board, containerId) : ({ freeform: false, positions: {}, notes: [], color: board.color });
+        const c = containerId ? Api.get("children", [], containerId) : [];
+        board = b;
+        cards = c;
+        items = c.concat(b.notes.map(n => Object.assign({ note: true }, n)));
     }
-    // ---- drag and drop: move a card before / after another, or into a folder card ----
+
+    // ---- freeform layout. Positions are in board units: pixels at the
+    // standard card width (230), so the Card size slider scales the layout.
+    readonly property real unit: cardWidth / 230
+    readonly property real baseW: 230
+    readonly property real baseH: 230 * 0.66
+    readonly property real gapU: 16
+    readonly property int margin: 12
+    // Slots for unplaced cards fill the board's width (the board, not the
+    // view, so a note added on the grid lands sensibly too).
+    readonly property int freeColumns: Math.max(1, Math.floor((cb.width - 2 * margin - 14 + gapU * unit) / ((baseW + gapU) * unit)))
+    // Where every item sits ({id: {x, y}} in board units). Cards that were
+    // never placed take the first grid slots no placed card or note covers.
+    readonly property var spots: layoutItems(items, board.positions, freeColumns)
+    function overlaps(r, x, y) { return x < r.x + baseW + gapU / 2 && r.x < x + baseW + gapU / 2 && y < r.y + baseH + gapU / 2 && r.y < y + baseH + gapU / 2; }
+    function layoutItems(list, positions, cols) {
+        const out = {}, taken = [];
+        for (const it of list) {
+            const p = it.note ? [it.x, it.y] : positions[it.id];
+            if (p) { out[it.id] = { x: p[0], y: p[1] }; taken.push(out[it.id]); }
+        }
+        let slot = 0;
+        for (const it of list) {
+            if (out[it.id]) continue;
+            out[it.id] = freeSlot(taken, cols, slot);
+            slot = out[it.id].slot + 1;
+            taken.push(out[it.id]);
+        }
+        return out;
+    }
+    function freeSlot(taken, cols, from) {
+        for (let s = from || 0; ; ++s) {
+            const x = (s % cols) * (baseW + gapU), y = Math.floor(s / cols) * (baseH + gapU);
+            if (!taken.some(r => overlaps(r, x, y))) return { x: x, y: y, slot: s };
+        }
+    }
+    // The first empty slot on the board (for a new note).
+    function nextFreeSpot() { return freeSlot(Object.values(spots), freeColumns, 0); }
+    function setFreeform(on) {
+        if (on === freeform || !containerId) return;
+        Api.call("setBoardFreeform", containerId, on);
+    }
+    // Board units → pixels inside the freeform view's content, and back.
+    function toView(u) { return margin + u * unit; }
+    function toUnits(px) { return Math.max(0, (px - margin) / unit); }
+    // The card or note at a point of the freeform view's content, or "".
+    function idAtBoard(px, py) {
+        const x = toUnits(px), y = toUnits(py);
+        const hit = freeOrder.slice().reverse().find(it => { const p = spots[it.id]; return p && x >= p.x && x <= p.x + baseW && y >= p.y && y <= p.y + baseH; });
+        return hit ? hit.id : "";
+    }
+    function placeAt(id, px, py) { return Api.call("placeOnBoard", containerId, id, toUnits(px), toUnits(py)) !== undefined; }
+    // Add a note; in freeform at (x, y) units, else (or with no spot) in the
+    // first free slot. Returns its id and focuses its text.
+    function addNote(at) {
+        if (!containerId) return "";
+        const p = at || nextFreeSpot();
+        const id = Api.call("addBoardNote", containerId, p.x, p.y, "");
+        // The board has already reloaded (the call bumps the revision).
+        if (id) { keyId = id; Qt.callLater(() => { const f = noteEditor(id); if (f) f.forceActiveFocus(); }); }
+        return id || "";
+    }
+    function noteToDocument(noteId) {
+        const id = Api.call("boardNoteToItem", containerId, noteId);
+        if (id) keyId = id;
+        return id || "";
+    }
+    // Reading order: rows top to bottom (a card within half a card's height
+    // of a row's first card joins the row), left to right within a row.
+    // For the arrow keys, and Order Binder by Board.
+    readonly property var freeOrder: {
+        const s = spots;
+        const list = items.filter(it => s[it.id]).sort((a, b) => s[a.id].y - s[b.id].y || s[a.id].x - s[b.id].x);
+        const out = [];
+        for (let i = 0; i < list.length;) {
+            const top = s[list[i].id].y;
+            let j = i;
+            while (j < list.length && s[list[j].id].y - top < baseH / 2) ++j;
+            out.push(...list.slice(i, j).sort((a, b) => s[a.id].x - s[b.id].x));
+            i = j;
+        }
+        return out;
+    }
+    // Arrange ▸ Order Binder by Board: the cards (not notes) as they read.
+    function orderBinder() { Api.call("orderChildren", containerId, freeOrder.filter(it => !it.note).map(it => it.id)); }
+
+    // ---- grid drag and drop: move a card before / after another, or into a folder card ----
     property string dragId: ""
     property string dragTitle: ""
     property point dragPos: Qt.point(0, 0)   // pointer, in cb's coordinates
@@ -49,9 +173,10 @@ Rectangle {
         const p = grid.contentItem.mapFromItem(null, scenePos.x, scenePos.y);
         let i = grid.indexAt(p.x, p.y);
         let mode = "";
-        if (i < 0) {
-            // Past the last card: drop at the end.
-            if (cards.length && p.y >= 0) { i = cards.length - 1; mode = "after"; }
+        if (i < 0 || i >= cards.length) {
+            // Past the last card (or over a note): drop at the end.
+            if (cards.length && (i >= cards.length || p.y >= 0)) { i = cards.length - 1; mode = "after"; }
+            else i = -1;
         } else {
             const item = grid.itemAtIndex(i);
             const fx = item ? (p.x - item.x) / item.width : 0.5;
@@ -66,36 +191,63 @@ Rectangle {
     }
     // ---- keyboard: ← → ↑ ↓ Home End move a highlight between cards, Enter
     // opens (a folder on the board, a document in the editor), Backspace
-    // goes up a folder, Ctrl+arrows move the card, Delete trashes it ----
-    property string keyId: ""                // the highlighted card
+    // goes up a folder, Ctrl+arrows move the card (in the binder on a grid,
+    // across the board when freeform), Delete trashes it (or deletes a note) ----
+    property string keyId: ""                // the highlighted card or note
     property string keyAfterReload: ""       // highlight this card once the board reloads
     readonly property int columns: Math.max(1, Math.floor(grid.width / grid.cellWidth))
-    readonly property int keyIndex: cards.findIndex(c => c.id === keyId)
-    onCardsChanged: {
-        const want = [keyAfterReload, keyId, nodeId].find(id => id && cards.some(c => c.id === id));
-        keyId = want || (cards.length ? cards[0].id : "");
+    readonly property int keyIndex: items.findIndex(c => c.id === keyId)
+    onItemsChanged: {
+        const want = [keyAfterReload, keyId, nodeId].find(id => id && items.some(c => c.id === id));
+        keyId = want || (items.length ? items[0].id : "");
         keyAfterReload = "";
     }
     function highlight(i) {
-        if (!cards.length) return;
-        i = Math.max(0, Math.min(cards.length - 1, i));
-        keyId = cards[i].id;
-        grid.positionViewAtIndex(i, GridView.Contain);
+        if (!items.length) return;
+        i = Math.max(0, Math.min(items.length - 1, i));
+        keyId = items[i].id;
+        if (freeform) revealFree(keyId); else grid.positionViewAtIndex(i, GridView.Contain);
+    }
+    function revealFree(id) {
+        const p = spots[id];
+        if (!p) return;
+        const x = toView(p.x), y = toView(p.y);
+        if (x < freeView.contentX) freeView.contentX = Math.max(0, x - margin);
+        else if (x + cardWidth > freeView.contentX + freeView.width) freeView.contentX = x + cardWidth + margin - freeView.width;
+        if (y < freeView.contentY) freeView.contentY = Math.max(0, y - margin);
+        else if (y + cardHeight > freeView.contentY + freeView.height) freeView.contentY = y + cardHeight + margin - freeView.height;
     }
     function handleKey(e) {
         const i = keyIndex, ctrl = e.modifiers & Qt.ControlModifier;
-        const step = (e.key === Qt.Key_Left) ? -1 : (e.key === Qt.Key_Right) ? 1
-                   : (e.key === Qt.Key_Up) ? -columns : (e.key === Qt.Key_Down) ? columns : 0;
-        if (step !== 0) {
+        const it = i >= 0 ? items[i] : null;
+        const arrow = [Qt.Key_Left, Qt.Key_Right, Qt.Key_Up, Qt.Key_Down].indexOf(e.key);
+        if (arrow >= 0) {
+            if (freeform) {
+                if (ctrl) {
+                    // Nudge the card or note a little.
+                    if (it && spots[it.id]) {
+                        const p = spots[it.id], d = 20;
+                        const dx = [-d, d, 0, 0][arrow], dy = [0, 0, -d, d][arrow];
+                        Api.call("placeOnBoard", containerId, it.id, Math.max(0, p.x + dx), Math.max(0, p.y + dy));
+                    }
+                } else {
+                    const order = freeOrder, k = order.findIndex(c => c.id === keyId);
+                    const next = order[Math.max(0, Math.min(order.length - 1, k < 0 ? 0 : k + (arrow % 2 === 0 ? -1 : 1)))];
+                    if (next) { keyId = next.id; revealFree(next.id); }
+                }
+                return true;
+            }
+            const step = [-1, 1, -columns, columns][arrow];
             // Ctrl: one place earlier or later (the binder's order).
-            if (ctrl) { if (i >= 0) Api.call("shift", cards[i].id, step < 0 ? -1 : 1); }
+            if (ctrl) { if (it && !it.note) Api.call("shift", it.id, step < 0 ? -1 : 1); }
             else highlight(i < 0 ? 0 : i + step);
             return true;
         }
         if (e.key === Qt.Key_Home) { highlight(0); return true; }
-        if (e.key === Qt.Key_End) { highlight(cards.length - 1); return true; }
-        if ((e.key === Qt.Key_Return || e.key === Qt.Key_Enter) && i >= 0) {
-            if (cards[i].child_count > 0) selectRequested(cards[i].id); else openRequested(cards[i].id);
+        if (e.key === Qt.Key_End) { highlight(items.length - 1); return true; }
+        if ((e.key === Qt.Key_Return || e.key === Qt.Key_Enter) && it) {
+            if (it.note) { const f = noteEditor(it.id); if (f) f.forceActiveFocus(); }
+            else if (it.child_count > 0) selectRequested(it.id); else openRequested(it.id);
             return true;
         }
         if (e.key === Qt.Key_Backspace) {
@@ -103,21 +255,35 @@ Rectangle {
             if (up) { keyAfterReload = containerId; selectRequested(up); }
             return true;
         }
-        if (e.key === Qt.Key_Delete && i >= 0) {
-            const next = cards[i + 1] || cards[i - 1];
+        if (e.key === Qt.Key_Delete && it) {
+            const next = items[i + 1] || items[i - 1];
             keyAfterReload = next ? next.id : "";
-            Api.call("trash", cards[i].id);
+            if (it.note) Api.call("removeBoardNote", containerId, it.id);
+            else Api.call("trash", it.id);
             return true;
         }
         return false;
     }
-    function focusBoard() { grid.forceActiveFocus(); }
+    function focusBoard() { (freeform ? freeView : grid).forceActiveFocus(); }
+    readonly property bool boardFocused: grid.activeFocus || freeView.activeFocus
+
+    // The shown card or note for an id (in the grid, or on the freeform board).
+    function cardItem(id) {
+        if (freeform) {
+            for (let k = 0; k < freeRep.count; ++k) { const d = freeRep.itemAt(k); if (d && d.modelData.id === id) return d.face; }
+            return null;
+        }
+        const i = items.findIndex(c => c.id === id);
+        const cell = i >= 0 ? grid.itemAtIndex(i) : null;
+        return cell ? cell.face : null;
+    }
+    function noteEditor(id) { const f = cardItem(id); return f ? f.textEditor : null; }
 
     // A spot on card `i` that isn't text (just inside its left edge), in
     // window coordinates: where a real drag can start.
-    function cardGrip(i) { const it = grid.itemAtIndex(i); return it ? it.mapToItem(null, 12, it.height / 2) : null; }
+    function cardGrip(i) { const it = i >= 0 && i < items.length ? cardItem(items[i].id) : null; return it ? it.mapToItem(null, 4, it.height / 2) : null; }
     // A point on card `i` (fraction `fx` across it), in window coordinates.
-    function cardPoint(i, fx) { const it = grid.itemAtIndex(i); return it ? it.mapToItem(null, it.width * fx, it.height / 2) : null; }
+    function cardPoint(i, fx) { const it = i >= 0 && i < items.length ? cardItem(items[i].id) : null; return it ? it.mapToItem(null, it.width * fx, it.height / 2) : null; }
     // Returns true if the card moved.
     function finishDrag() {
         const id = dragId, mode = dropMode, target = dropIndex >= 0 && dropIndex < cards.length ? cards[dropIndex].id : "";
@@ -134,39 +300,140 @@ Rectangle {
         return "";
     }
 
+    ColorDialog {
+        id: boardColorDialog
+        title: qsTr("Corkboard Colour")
+        onAccepted: cb.setBoardColor(cb.hex(selectedColor))
+    }
+    Menu {
+        id: colorMenu
+        Repeater {
+            model: cb.boardColors
+            delegate: MenuItem {
+                required property var modelData
+                text: modelData.name
+                checkable: true
+                checked: (cb.board.color || "") === modelData.c
+                indicator: Rectangle {
+                    x: 8; anchors.verticalCenter: parent.verticalCenter; width: 14; height: 14; radius: 3
+                    color: modelData.c || Theme.cork; border.color: Theme.border; border.width: parent.checked ? 2 : 1
+                }
+                onTriggered: cb.setBoardColor(modelData.c)
+            }
+        }
+        MenuSeparator {}
+        MenuItem { text: qsTr("Custom Colour…"); onTriggered: { boardColorDialog.selectedColor = cb.boardColor; boardColorDialog.open(); } }
+    }
+    Menu {
+        id: arrangeMenu
+        MenuItem { text: qsTr("Tidy Up"); onTriggered: Api.call("tidyBoard", cb.containerId) }
+        MenuItem { text: qsTr("Order Binder by Board"); onTriggered: cb.orderBinder() }
+    }
+    // Right-click on the empty board.
+    Menu {
+        id: boardMenu
+        property point at: Qt.point(0, 0)   // board units (freeform)
+        MenuItem { text: qsTr("New Card"); enabled: cb.containerId !== ""; onTriggered: cb.addCard(cb.freeform ? boardMenu.at : null) }
+        MenuItem { text: qsTr("New Note"); enabled: cb.containerId !== ""; onTriggered: cb.addNote(cb.freeform ? boardMenu.at : null) }
+        MenuSeparator {}
+        MenuItem { text: qsTr("Freeform"); checkable: true; checked: cb.freeform; onTriggered: cb.setFreeform(!cb.freeform) }
+        MenuItem { visible: cb.freeform; height: visible ? implicitHeight : 0; text: qsTr("Tidy Up"); onTriggered: Api.call("tidyBoard", cb.containerId) }
+        MenuItem { visible: cb.freeform; height: visible ? implicitHeight : 0; text: qsTr("Order Binder by Board"); onTriggered: cb.orderBinder() }
+        MenuItem { text: qsTr("Board Colour…"); onTriggered: colorMenu.popup() }
+    }
+    // A new binder card; on a freeform board at `at` (board units).
+    function addCard(at) {
+        const id = Api.call("add", containerId, "", "", true);
+        if (!id) return "";
+        if (at) Api.call("placeOnBoard", containerId, id, at.x, at.y);
+        selectRequested(id);
+        return id;
+    }
+
     ColumnLayout {
         anchors.fill: parent
         spacing: 0
         Rectangle {
             Layout.fillWidth: true
             Layout.preferredHeight: 38
-            color: Qt.darker(Theme.cork, 1.08)
+            color: Qt.darker(cb.boardColor, 1.08)
             RowLayout {
                 anchors.fill: parent
                 anchors.leftMargin: 12
                 anchors.rightMargin: 12
-                Label { text: "▦  " + cb.containerTitle; font.bold: true; color: Theme.dark ? Theme.text : "#3b2b17"; Layout.fillWidth: true }
-                Label { text: qsTr("Card size"); color: Theme.dark ? Theme.subtext : "#3b2b17" }
-                Slider { from: 170; to: 360; value: cb.cardWidth; onMoved: cb.cardWidth = value; Layout.preferredWidth: 120 }
+                spacing: 6
+                Label { text: "▦  " + cb.containerTitle; font.bold: true; color: cb.boardText; elide: Text.ElideRight; Layout.fillWidth: true; Layout.minimumWidth: 40 }
+                // Grid / Freeform
+                Row {
+                    Repeater {
+                        model: [{ free: false, label: qsTr("Grid"), tip: qsTr("Cards in binder order; drag to reorder") },
+                                { free: true, label: qsTr("Freeform"), tip: qsTr("Put cards anywhere; the binder order stays as it is") }]
+                        delegate: Button {
+                            required property var modelData
+                            text: modelData.label
+                            checkable: true
+                            checked: cb.freeform === modelData.free
+                            highlighted: checked
+                            enabled: cb.containerId !== ""
+                            focusPolicy: Qt.NoFocus
+                            onClicked: cb.setFreeform(modelData.free)
+                            ToolTip.visible: hovered
+                            ToolTip.text: modelData.tip
+                        }
+                    }
+                }
+                Button {
+                    id: arrangeButton
+                    visible: cb.freeform
+                    text: qsTr("Arrange ▾")
+                    focusPolicy: Qt.NoFocus
+                    onClicked: arrangeMenu.popup(arrangeButton, 0, arrangeButton.height)
+                }
+                Label { visible: cb.width > 760; text: qsTr("Card size"); color: cb.boardText }
+                Slider { visible: cb.width > 640; from: 170; to: 360; value: cb.cardWidth; onMoved: cb.cardWidth = value; Layout.preferredWidth: 110; focusPolicy: Qt.NoFocus }
                 Button {
                     text: qsTr("+ Card")
                     enabled: cb.containerId !== ""
-                    onClicked: { const id = Api.call("add", cb.containerId, "", "", true); if (id) cb.selectRequested(id); }
+                    focusPolicy: Qt.NoFocus
+                    onClicked: cb.addCard(null)
+                    ToolTip.visible: hovered
+                    ToolTip.text: qsTr("A new document in this folder")
+                }
+                Button {
+                    text: qsTr("+ Note")
+                    enabled: cb.containerId !== ""
+                    focusPolicy: Qt.NoFocus
+                    onClicked: cb.addNote(null)
+                    ToolTip.visible: hovered
+                    ToolTip.text: qsTr("A sticky note on this board only (not in the binder)")
+                }
+                Button {
+                    id: colorButton
+                    focusPolicy: Qt.NoFocus
+                    implicitWidth: 34
+                    onClicked: colorMenu.popup(colorButton, 0, colorButton.height)
+                    ToolTip.visible: hovered
+                    ToolTip.text: qsTr("Board colour")
+                    contentItem: Item {
+                        Rectangle { anchors.centerIn: parent; width: 16; height: 16; radius: 3; color: cb.boardColor; border.color: cb.boardText; border.width: 1 }
+                    }
                 }
             }
         }
 
+        // ---- grid ----
         GridView {
             id: grid
+            visible: !cb.freeform
             Layout.fillWidth: true
             Layout.fillHeight: true
             Layout.margins: 12
             clip: true
             cellWidth: cb.cardWidth + 16
-            cellHeight: cb.cardWidth * 0.66 + 16
-            model: cb.cards
+            cellHeight: cb.cardHeight + 16
+            model: cb.freeform ? [] : cb.items
             ScrollBar.vertical: ScrollBar {}
-            activeFocusOnTab: true
+            activeFocusOnTab: !cb.freeform
             Keys.onPressed: (e) => { if (cb.handleKey(e)) e.accepted = true; }
             // Shows that the keys go to the board.
             Rectangle {
@@ -177,133 +444,306 @@ Rectangle {
                 radius: 4
                 z: -1
             }
+            TapHandler {
+                acceptedButtons: Qt.RightButton
+                onTapped: (ep) => { if (grid.indexAt(ep.position.x + grid.contentX, ep.position.y + grid.contentY) < 0) boardMenu.popup(); }
+            }
 
             delegate: Item {
                 id: cell
                 required property var modelData
                 required property int index
+                property alias face: cardFace
                 width: grid.cellWidth
                 height: grid.cellHeight
-
-                Rectangle {
-                    id: card
+                CardFace {
+                    id: cardFace
                     anchors.fill: parent
                     anchors.margins: 8
-                    color: Theme.card
-                    radius: 3
-                    border.width: cell.modelData.id === cb.nodeId ? 2 : 1
-                    border.color: cell.modelData.id === cb.nodeId ? Theme.accent : Qt.rgba(0, 0, 0, 0.18)
-                    opacity: cell.modelData.id === cb.dragId ? 0.35 : cell.modelData.include_in_compile ? 1 : 0.7
+                    modelData: cell.modelData
+                    cardIndex: cell.index
+                    focusView: grid
+                }
+            }
+        }
 
-                    // Label colour strip
-                    Rectangle {
-                        width: parent.width; height: 5; radius: 2
-                        color: cell.modelData.label_color || "transparent"
-                    }
-                    // Ruled lines like an index card
-                    Repeater {
-                        model: Math.max(0, Math.floor((card.height - 40) / 20))
-                        Rectangle { x: 8; width: card.width - 16; height: 1; y: 40 + index * 20; color: Theme.cardLine; required property int index }
-                    }
+        // ---- freeform ----
+        Flickable {
+            id: freeView
+            visible: cb.freeform
+            Layout.fillWidth: true
+            Layout.fillHeight: true
+            clip: true
+            boundsBehavior: Flickable.StopAtBounds
+            // Room for every card, plus space to drag one further out.
+            contentWidth: Math.max(width, freeContent.extentX + cb.cardWidth)
+            contentHeight: Math.max(height, freeContent.extentY + cb.cardHeight)
+            ScrollBar.vertical: ScrollBar {}
+            ScrollBar.horizontal: ScrollBar {}
+            activeFocusOnTab: cb.freeform
+            interactive: false   // the mouse is for moving cards; wheel and scroll bars scroll
+            Keys.onPressed: (e) => { if (cb.handleKey(e)) e.accepted = true; }
+            WheelHandler {
+                acceptedModifiers: Qt.NoModifier
+                onWheel: (e) => {
+                    const d = e.pixelDelta.y !== 0 ? e.pixelDelta.y : e.angleDelta.y / 2;
+                    const dx = e.pixelDelta.x !== 0 ? e.pixelDelta.x : e.angleDelta.x / 2;
+                    freeView.contentY = Math.max(0, Math.min(freeView.contentHeight - freeView.height, freeView.contentY - d));
+                    freeView.contentX = Math.max(0, Math.min(freeView.contentWidth - freeView.width, freeView.contentX - dx));
+                }
+            }
+            WheelHandler {
+                acceptedModifiers: Qt.ShiftModifier
+                onWheel: (e) => freeView.contentX = Math.max(0, Math.min(freeView.contentWidth - freeView.width, freeView.contentX - e.angleDelta.y / 2))
+            }
 
-                    ColumnLayout {
-                        anchors.fill: parent
-                        anchors.margins: 10
-                        anchors.topMargin: 10
-                        spacing: 2
-                        RowLayout {
-                            Layout.fillWidth: true
-                            KindIcon { kind: cell.modelData.kind; size: 14 }
-                            TextField {
-                                id: titleEdit
-                                Layout.fillWidth: true
-                                text: cell.modelData.title
-                                font.bold: true
-                                color: Theme.ink
-                                background: null
-                                padding: 0
-                                selectByMouse: true
-                                onEditingFinished: if (text !== cell.modelData.title && text.trim().length) Api.call("setField", cell.modelData.id, "title", text)
-                            }
-                        }
-                        TextArea {
-                            id: synopsis
-                            Layout.fillWidth: true
-                            Layout.fillHeight: true
-                            text: cell.modelData.synopsis
-                            placeholderText: qsTr("Synopsis…")
-                            wrapMode: TextEdit.Wrap
-                            font.family: Theme.editorFont
-                            font.pixelSize: 13
-                            color: Theme.ink
-                            background: null
-                            padding: 0
-                            selectByMouse: true
-                            onActiveFocusChanged: if (!activeFocus && text !== cell.modelData.synopsis) Api.call("setField", cell.modelData.id, "synopsis", text)
-                        }
-                        RowLayout {
-                            Layout.fillWidth: true
-                            Label { text: cell.modelData.status_name || ""; color: Theme.accent; font.pixelSize: 10; font.bold: true; font.capitalization: Font.AllUppercase }
-                            Item { Layout.fillWidth: true }
-                            Label {
-                                text: Api.fmtNumber(cell.modelData.total_words) + (cell.modelData.target_words ? "/" + Api.fmtNumber(cell.modelData.target_words) : "") + qsTr(" w")
-                                color: Theme.subtext; font.pixelSize: 10
-                            }
-                            Label { visible: cell.modelData.child_count > 0; text: "▤ " + cell.modelData.child_count; color: Theme.subtext; font.pixelSize: 10 }
-                        }
+            Item {
+                id: freeContent
+                width: freeView.contentWidth
+                height: freeView.contentHeight
+                readonly property real extentX: { let m = 0; for (const id in cb.spots) m = Math.max(m, cb.toView(cb.spots[id].x) + cb.cardWidth); return m + cb.margin; }
+                readonly property real extentY: { let m = 0; for (const id in cb.spots) m = Math.max(m, cb.toView(cb.spots[id].y) + cb.cardHeight); return m + cb.margin; }
+                // Shows that the keys go to the board.
+                Rectangle {
+                    x: freeView.contentX + 2; y: freeView.contentY + 2
+                    width: freeView.width - 4; height: freeView.height - 4
+                    color: "transparent"
+                    border.width: freeView.activeFocus ? 2 : 0
+                    border.color: Qt.rgba(Theme.accent.r, Theme.accent.g, Theme.accent.b, 0.5)
+                    radius: 4
+                }
+                TapHandler {
+                    acceptedButtons: Qt.LeftButton
+                    onTapped: freeView.forceActiveFocus()
+                    onDoubleTapped: (ep) => { if (!cb.idAtBoard(ep.position.x, ep.position.y)) cb.addNote({ x: cb.toUnits(ep.position.x), y: cb.toUnits(ep.position.y) }); }
+                }
+                TapHandler {
+                    acceptedButtons: Qt.RightButton
+                    onTapped: (ep) => {
+                        if (cb.idAtBoard(ep.position.x, ep.position.y)) return;   // the card's own menu
+                        boardMenu.at = Qt.point(cb.toUnits(ep.position.x), cb.toUnits(ep.position.y));
+                        boardMenu.popup();
                     }
+                }
 
-                    TapHandler {
-                        acceptedButtons: Qt.LeftButton
-                        onTapped: { cb.keyId = cell.modelData.id; cb.selectRequested(cell.modelData.id); grid.forceActiveFocus(); }
-                        onDoubleTapped: cb.openRequested(cell.modelData.id)
-                    }
-                    TapHandler { acceptedButtons: Qt.RightButton; onTapped: cardMenu.popup() }
-                    // Drag from anywhere that isn't text (the edges, the
-                    // ruled area, the footer, the icon); the title and
-                    // synopsis keep the mouse for selecting text.
-                    DragHandler {
-                        id: dragger
-                        target: null
-                        acceptedButtons: Qt.LeftButton
-                        cursorShape: active ? Qt.ClosedHandCursor : Qt.ArrowCursor
-                        onActiveChanged: {
-                            if (active) cb.startDrag(cell.modelData.id, cell.modelData.title);
-                            else cb.finishDrag();
+                Repeater {
+                    id: freeRep
+                    model: cb.freeform ? cb.items : []
+                    delegate: Item {
+                        id: spot
+                        required property var modelData
+                        required property int index
+                        property alias face: freeFace
+                        readonly property var at: cb.spots[modelData.id] || { x: 0, y: 0 }
+                        x: cb.toView(at.x)
+                        y: cb.toView(at.y)
+                        width: cb.cardWidth
+                        height: cb.cardHeight
+                        // The one being moved, and the highlighted one, on top.
+                        z: freeFace.moving ? 10 : cb.keyId === modelData.id ? 2 : 1
+                        CardFace {
+                            id: freeFace
+                            anchors.fill: parent
+                            modelData: spot.modelData
+                            cardIndex: spot.index
+                            mover: spot
+                            focusView: freeView
                         }
-                        onCentroidChanged: if (active) cb.updateDrag(centroid.scenePosition)
-                    }
-                    // The keyboard highlight.
-                    Rectangle {
-                        anchors.fill: parent
-                        anchors.margins: -4
-                        visible: grid.activeFocus && cb.keyId === cell.modelData.id
-                        color: "transparent"
-                        border.width: 2
-                        border.color: Theme.accent
-                        radius: 5
-                    }
-                    // "Drop inside this folder" highlight.
-                    Rectangle {
-                        anchors.fill: parent
-                        visible: cb.dropMode === "inside" && cb.dropIndex === cell.index
-                        color: "transparent"
-                        border.width: 3
-                        border.color: Theme.accent
-                        radius: 3
-                    }
-                    Menu {
-                        id: cardMenu
-                        MenuItem { text: qsTr("Open in Editor"); onTriggered: cb.openRequested(cell.modelData.id) }
-                        MenuItem { text: qsTr("Move Earlier"); onTriggered: Api.call("shift", cell.modelData.id, -1) }
-                        MenuItem { text: qsTr("Move Later"); onTriggered: Api.call("shift", cell.modelData.id, 1) }
-                        MenuItem { text: qsTr("Duplicate"); onTriggered: Api.call("duplicate", cell.modelData.id) }
-                        MenuItem { text: cell.modelData.include_in_compile ? qsTr("Exclude from Compile") : qsTr("Include in Compile"); onTriggered: Api.call("setField", cell.modelData.id, "include_in_compile", !cell.modelData.include_in_compile) }
-                        MenuSeparator {}
-                        MenuItem { text: qsTr("Move to Trash"); onTriggered: Api.call("trash", cell.modelData.id) }
                     }
                 }
             }
+        }
+    }
+
+    // A card or a note. In the grid, dragging reorders (cards only); on a
+    // freeform board it moves `mover`, and dropping saves the spot.
+    component CardFace: Rectangle {
+        id: face
+        required property var modelData
+        property int cardIndex: 0
+        property Item mover: null            // set on a freeform board
+        property Item focusView: null
+        readonly property bool isNote: !!modelData.note
+        readonly property bool moving: dragger.active
+        readonly property alias textEditor: synopsis
+        color: isNote ? cb.noteColor(modelData.color) : Theme.card
+        radius: 3
+        border.width: !isNote && modelData.id === cb.nodeId ? 2 : 1
+        border.color: !isNote && modelData.id === cb.nodeId ? Theme.accent : Qt.rgba(0, 0, 0, 0.18)
+        opacity: modelData.id === cb.dragId ? 0.35 : (isNote || modelData.include_in_compile) ? 1 : 0.7
+
+        // A shadow while it's lifted.
+        Rectangle {
+            visible: face.moving
+            anchors.fill: parent
+            anchors.margins: -1
+            anchors.topMargin: 3
+            anchors.leftMargin: 3
+            z: -1
+            radius: 4
+            color: Qt.rgba(0, 0, 0, 0.25)
+        }
+        // Label colour strip (cards), or a pin (notes)
+        Rectangle {
+            visible: !face.isNote
+            width: parent.width; height: 5; radius: 2
+            color: face.modelData.label_color || "transparent"
+        }
+        Rectangle {
+            visible: face.isNote
+            anchors.horizontalCenter: parent.horizontalCenter
+            y: -4
+            width: 10; height: 10; radius: 5
+            color: "#c0392b"
+            border.color: Qt.rgba(0, 0, 0, 0.3)
+        }
+        // Ruled lines like an index card
+        Repeater {
+            model: face.isNote ? 0 : Math.max(0, Math.floor((face.height - 40) / 20))
+            Rectangle { x: 8; width: face.width - 16; height: 1; y: 40 + index * 20; color: Theme.cardLine; required property int index }
+        }
+
+        ColumnLayout {
+            anchors.fill: parent
+            anchors.margins: 10
+            anchors.topMargin: 10
+            spacing: 2
+            RowLayout {
+                Layout.fillWidth: true
+                KindIcon { visible: !face.isNote; kind: face.modelData.kind || ""; size: 14 }
+                TextField {
+                    id: titleEdit
+                    Layout.fillWidth: true
+                    text: face.modelData.title
+                    placeholderText: face.isNote ? qsTr("Note") : ""
+                    font.bold: true
+                    color: Theme.ink
+                    background: null
+                    padding: 0
+                    selectByMouse: true
+                    onEditingFinished: {
+                        if (text === face.modelData.title) return;
+                        if (face.isNote) Api.call("updateBoardNote", cb.containerId, face.modelData.id, text, synopsis.text);
+                        else if (text.trim().length) Api.call("setField", face.modelData.id, "title", text);
+                    }
+                }
+            }
+            TextArea {
+                id: synopsis
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                readonly property string saved: face.isNote ? face.modelData.text : face.modelData.synopsis
+                text: saved
+                placeholderText: face.isNote ? qsTr("Write a note…") : qsTr("Synopsis…")
+                wrapMode: TextEdit.Wrap
+                font.family: Theme.editorFont
+                font.pixelSize: 13
+                color: Theme.ink
+                background: null
+                padding: 0
+                selectByMouse: true
+                onActiveFocusChanged: {
+                    if (activeFocus) { cb.keyId = face.modelData.id; return; }
+                    if (text === saved) return;
+                    if (face.isNote) Api.call("updateBoardNote", cb.containerId, face.modelData.id, titleEdit.text, text);
+                    else Api.call("setField", face.modelData.id, "synopsis", text);
+                }
+                Keys.onEscapePressed: if (face.focusView) face.focusView.forceActiveFocus()
+            }
+            RowLayout {
+                Layout.fillWidth: true
+                visible: !face.isNote
+                Label { text: face.modelData.status_name || ""; color: Theme.accent; font.pixelSize: 10; font.bold: true; font.capitalization: Font.AllUppercase }
+                Item { Layout.fillWidth: true }
+                Label {
+                    text: face.isNote ? "" : Api.fmtNumber(face.modelData.total_words) + (face.modelData.target_words ? "/" + Api.fmtNumber(face.modelData.target_words) : "") + qsTr(" w")
+                    color: Theme.subtext; font.pixelSize: 10
+                }
+                Label { visible: face.modelData.child_count > 0; text: "▤ " + face.modelData.child_count; color: Theme.subtext; font.pixelSize: 10 }
+            }
+        }
+
+        TapHandler {
+            acceptedButtons: Qt.LeftButton
+            onTapped: {
+                cb.keyId = face.modelData.id;
+                if (!face.isNote) cb.selectRequested(face.modelData.id);
+                if (face.focusView) face.focusView.forceActiveFocus();
+            }
+            onDoubleTapped: { if (face.isNote) synopsis.forceActiveFocus(); else cb.openRequested(face.modelData.id); }
+        }
+        TapHandler { acceptedButtons: Qt.RightButton; onTapped: { cb.keyId = face.modelData.id; (face.isNote ? noteMenu : cardMenu).popup(); } }
+        // Drag from anywhere that isn't text (the edges, the ruled area,
+        // the footer, the icon); the title and text keep the mouse for
+        // selecting text. On a grid only cards move (in the binder).
+        DragHandler {
+            id: dragger
+            target: face.mover
+            enabled: face.mover !== null || !face.isNote
+            acceptedButtons: Qt.LeftButton
+            cursorShape: active ? Qt.ClosedHandCursor : Qt.ArrowCursor
+            xAxis.minimum: 0
+            yAxis.minimum: 0
+            onActiveChanged: {
+                if (face.mover) {
+                    if (active) { cb.keyId = face.modelData.id; return; }
+                    cb.placeAt(face.modelData.id, face.mover.x, face.mover.y);
+                } else if (active) cb.startDrag(face.modelData.id, face.modelData.title);
+                else cb.finishDrag();
+            }
+            onCentroidChanged: if (active && !face.mover) cb.updateDrag(centroid.scenePosition)
+        }
+        // The keyboard highlight.
+        Rectangle {
+            anchors.fill: parent
+            anchors.margins: -4
+            visible: cb.boardFocused && cb.keyId === face.modelData.id
+            color: "transparent"
+            border.width: 2
+            border.color: Theme.accent
+            radius: 5
+        }
+        // "Drop inside this folder" highlight.
+        Rectangle {
+            anchors.fill: parent
+            visible: !face.mover && cb.dropMode === "inside" && cb.dropIndex === face.cardIndex
+            color: "transparent"
+            border.width: 3
+            border.color: Theme.accent
+            radius: 3
+        }
+        Menu {
+            id: cardMenu
+            MenuItem { text: qsTr("Open in Editor"); onTriggered: cb.openRequested(face.modelData.id) }
+            MenuItem { text: qsTr("Move Earlier"); onTriggered: Api.call("shift", face.modelData.id, -1) }
+            MenuItem { text: qsTr("Move Later"); onTriggered: Api.call("shift", face.modelData.id, 1) }
+            MenuItem { text: qsTr("Duplicate"); onTriggered: Api.call("duplicate", face.modelData.id) }
+            MenuItem { text: face.modelData.include_in_compile ? qsTr("Exclude from Compile") : qsTr("Include in Compile"); onTriggered: Api.call("setField", face.modelData.id, "include_in_compile", !face.modelData.include_in_compile) }
+            MenuSeparator {}
+            MenuItem { text: qsTr("Move to Trash"); onTriggered: Api.call("trash", face.modelData.id) }
+        }
+        Menu {
+            id: noteMenu
+            Repeater {
+                model: cb.noteColors
+                delegate: MenuItem {
+                    required property var modelData
+                    text: modelData.name
+                    checkable: true
+                    checked: face.modelData.color === modelData.id
+                    indicator: Rectangle {
+                        x: 8; anchors.verticalCenter: parent.verticalCenter; width: 14; height: 14; radius: 3
+                        color: Theme.dark ? modelData.dark : modelData.light; border.color: Theme.border; border.width: parent.checked ? 2 : 1
+                    }
+                    onTriggered: Api.call("colorBoardNote", cb.containerId, face.modelData.id, modelData.id)
+                }
+            }
+            MenuSeparator {}
+            MenuItem {
+                text: qsTr("Make into Document")
+                onTriggered: { synopsis.focus = false; cb.noteToDocument(face.modelData.id); }
+            }
+            MenuItem { text: qsTr("Delete Note"); onTriggered: Api.call("removeBoardNote", cb.containerId, face.modelData.id) }
         }
     }
 
@@ -338,8 +778,9 @@ Rectangle {
 
     Label {
         anchors.centerIn: parent
-        visible: cb.cards.length === 0
-        text: cb.containerId ? qsTr("No cards here yet — add one with + Card.") : qsTr("Select a folder to see its cards.")
-        color: Theme.dark ? Theme.subtext : "#3b2b17"
+        visible: cb.items.length === 0
+        horizontalAlignment: Text.AlignHCenter
+        text: cb.containerId ? qsTr("No cards here yet — add one with + Card, or a note with + Note.") : qsTr("Select a folder to see its cards.")
+        color: cb.boardText
     }
 }

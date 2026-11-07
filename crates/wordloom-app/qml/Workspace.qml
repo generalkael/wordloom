@@ -249,6 +249,14 @@ Item {
         const n = (inSplit ? splitEditor : editorView).smartenAll();
         Api.say(n ? qsTr("Quotes, dashes and ellipses converted (Ctrl+Z undoes it)") : qsTr("Nothing to convert"));
     }
+    // Edit ▸ Paragraph Style: "body", "h1"…"h3" or "quote" on the caret's line.
+    function setParagraphStyle(style) {
+        if (!inSplit && viewMode !== "editor") viewMode = "editor";
+        (inSplit ? splitEditor : editorView).setParagraphStyle(style);
+    }
+    // View ▸ Editor Font & Spacing… (and the editor's Aa button).
+    function openTextSettings() { textSettings.open(); }
+    function textSettingsRef() { return textSettings; }
     // Insert a {>> comment <<} where you are typing.
     function insertComment() {
         if (!inSplit && viewMode !== "editor") viewMode = "editor";
@@ -277,7 +285,7 @@ Item {
         Qt.callLater(() => ed.showComment(docId, n));
     }
     function eventDialog() { return gantt.eventDialogRef; }
-    function closePopups() { gantt.closeDialogs(); compareDialog.close(); relationsView.dialogRef.close(); }
+    function closePopups() { gantt.closeDialogs(); compareDialog.close(); textSettings.close(); relationsView.dialogRef.close(); }
     function relationDialogRef() { return relationsView.dialogRef; }
     // Compare a snapshot of the current document with its text now (the
     // first snapshot if `snapId` is empty).
@@ -443,6 +451,7 @@ Item {
                         onEditorFocused: ws.splitFocused = false
                         onOpenRequested: (id) => ws.selectMain(id, "editor")
                         onCaretMoved: (doc, pos) => ws.noteCaret(doc, pos)
+                        onTextSettingsRequested: ws.openTextSettings()
                     }
                     CorkboardView {
                         id: corkboard
@@ -495,6 +504,7 @@ Item {
                     onOpenRequested: (id) => ws.openInSplit(id)
                     onSwapRequested: ws.swapSplit()
                     onCloseRequested: { splitEditor.flush(); ws.splitId = ""; }
+                    onTextSettingsRequested: ws.openTextSettings()
                 }
             }
 
@@ -613,6 +623,10 @@ Item {
         }
     }
 
+    TextSettingsDialog {
+        id: textSettings
+        anchors.centerIn: Overlay.overlay
+    }
     CompareDialog {
         id: compareDialog
         parent: Overlay.overlay

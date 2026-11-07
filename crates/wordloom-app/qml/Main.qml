@@ -141,7 +141,7 @@ ApplicationWindow {
         property string dir: ""
         property bool dark: false
         property int step: 0
-        readonly property var views: ["editor", "multiselect", "favorites", "corkboard", "carddrag", "outliner", "styled", "complete", "linebar", "repeats", "footnote", "timeline", "lanes", "event", "search", "goto", "compile", "pdf", "stats", "settings", "add", "undo", "split", "file", "compare", "relations", "relation", "names", "history", "sprint", "analysis", "grid", "autobackup", "newproject", "reader", "focus", "start"]
+        readonly property var views: ["editor", "multiselect", "favorites", "corkboard", "carddrag", "freeform", "outliner", "styled", "fonts", "complete", "linebar", "repeats", "footnote", "timeline", "lanes", "event", "search", "goto", "compile", "pdf", "stats", "settings", "add", "undo", "split", "file", "compare", "relations", "relation", "names", "history", "sprint", "analysis", "grid", "autobackup", "newproject", "reader", "focus", "start"]
         interval: 700
         repeat: true
         // Even ticks switch view, odd ticks capture it.
@@ -152,7 +152,7 @@ ApplicationWindow {
                 loader.grabToImage(r => r.saveToFile(file));
                 // Popups render in the window overlay, which can't be grabbed;
                 // capture the dialog's own content instead.
-                const dlg = { event: win.ws ? win.ws.eventDialog() : null, compile: compileDialog, pdf: compileDialog, goto: goTo, stats: statsDialog, settings: settingsDialog, compare: win.ws ? win.ws.compareDialogRef() : null, relation: win.ws ? win.ws.relationDialogRef() : null, names: nameDialog, sprint: sprintDialog, analysis: analysisDialog, grid: presenceDialog, autobackup: autoBackupDialog, newproject: newDialog }[v];
+                const dlg = { event: win.ws ? win.ws.eventDialog() : null, compile: compileDialog, pdf: compileDialog, goto: goTo, stats: statsDialog, settings: settingsDialog, compare: win.ws ? win.ws.compareDialogRef() : null, fonts: win.ws ? win.ws.textSettingsRef() : null, relation: win.ws ? win.ws.relationDialogRef() : null, names: nameDialog, sprint: sprintDialog, analysis: analysisDialog, grid: presenceDialog, autobackup: autoBackupDialog, newproject: newDialog }[v];
                 if (dlg && dlg.contentChildren.length) dlg.contentChildren[0].grabToImage(r => r.saveToFile(file.replace(".png", "-dialog.png")));
                 if (v === "history") historyWindow.contentItem.grabToImage(r => r.saveToFile(file.replace(".png", "-window.png")));
             } else if (v === undefined) {
@@ -224,6 +224,26 @@ ApplicationWindow {
                     const rows = Api.get("binder", []), id = (t) => rows.find(r => r.title === t).id;
                     for (const t of ["Night Watch", "Mara Quinn", "Lighthouse operation, 1890s"]) Api.call("setFavorite", id(t), true);
                     win.ws.select(id("Night Watch"), "editor");
+                }
+                else if (v === "freeform") {
+                    // The manuscript's board, freeform, with a note and a card moved off the grid.
+                    const ms = Api.call("rootId", "manuscript");
+                    win.ws.select(ms, "corkboard");
+                    Api.call("setBoardFreeform", ms, true);
+                    const b = Api.get("board", null, ms), kids = Api.get("children", [], ms);
+                    if (b && !b.notes.length) {
+                        const n = Api.call("addBoardNote", ms, 520, 330, "What if the keeper's log was never his? Check the handwriting.");
+                        Api.call("updateBoardNote", ms, n, "Idea", "What if the keeper's log was never his? Check the handwriting.");
+                        Api.call("colorBoardNote", ms, n, "yellow");
+                        const n2 = Api.call("addBoardNote", ms, 300, 520, "Research: Fresnel lens rotation speed");
+                        if (n2) Api.call("colorBoardNote", ms, n2, "blue");
+                        if (kids.length > 1) Api.call("placeOnBoard", ms, kids[kids.length - 1].id, 40, 330);
+                    }
+                }
+                else if (v === "fonts") {
+                    const row = Api.get("binder", []).find(r => r.title === "Arrival");
+                    if (row) win.ws.select(row.id, "editor");
+                    win.ws.openTextSettings();
                 }
                 else if (v === "carddrag") {
                     win.ws.select(Api.get("binder", []).find(r => r.title === "The Storm").id, "corkboard");
@@ -339,6 +359,15 @@ ApplicationWindow {
             Action { text: qsTr("&Replace in Document…"); shortcut: StandardKey.Replace; enabled: win.ws !== null; onTriggered: win.ws.findInDocument(true) }
             MenuSeparator {}
             Action { text: qsTr("Con&vert to Smart Punctuation"); enabled: win.ws !== null; onTriggered: win.ws.smartenDocument() }
+            Menu {
+                title: qsTr("Paragraph St&yle")
+                enabled: win.ws !== null
+                Action { text: qsTr("&Body Text"); shortcut: "Ctrl+Alt+0"; onTriggered: win.ws.setParagraphStyle("body") }
+                Action { text: qsTr("Heading &1"); shortcut: "Ctrl+Alt+1"; onTriggered: win.ws.setParagraphStyle("h1") }
+                Action { text: qsTr("Heading &2"); shortcut: "Ctrl+Alt+2"; onTriggered: win.ws.setParagraphStyle("h2") }
+                Action { text: qsTr("Heading &3"); shortcut: "Ctrl+Alt+3"; onTriggered: win.ws.setParagraphStyle("h3") }
+                Action { text: qsTr("Block &Quote"); shortcut: "Ctrl+Alt+Q"; onTriggered: win.ws.setParagraphStyle("quote") }
+            }
             Action { text: qsTr("Insert &Comment"); shortcut: "Ctrl+Alt+M"; enabled: win.ws !== null; onTriggered: win.ws.insertComment() }
             Action { text: qsTr("Insert &Footnote"); shortcut: "Ctrl+Alt+F"; enabled: win.ws !== null; onTriggered: win.ws.insertFootnote() }
         }
@@ -441,8 +470,13 @@ ApplicationWindow {
                 }
             }
             Action { text: qsTr("Styled &Markdown"); checkable: true; checked: Theme.styledMarkdown; onTriggered: Theme.styledMarkdown = !Theme.styledMarkdown }
-            Action { text: qsTr("Larger Text"); shortcut: StandardKey.ZoomIn; onTriggered: Theme.editorSize = Math.min(40, Theme.editorSize + 1) }
-            Action { text: qsTr("Smaller Text"); shortcut: StandardKey.ZoomOut; onTriggered: Theme.editorSize = Math.max(9, Theme.editorSize - 1) }
+            Action { text: qsTr("Editor &Font && Spacing…"); onTriggered: win.ws.openTextSettings() }
+            Menu {
+                title: qsTr("&Zoom (%1)").arg(Theme.zoomText)
+                Action { text: qsTr("Zoom &In"); shortcut: StandardKey.ZoomIn; onTriggered: Theme.zoomIn() }
+                Action { text: qsTr("Zoom &Out"); shortcut: StandardKey.ZoomOut; onTriggered: Theme.zoomOut() }
+                Action { text: qsTr("&Actual Size"); shortcut: "Ctrl+0"; onTriggered: Theme.resetZoom() }
+            }
             Menu {
                 title: qsTr("Appearance")
                 Action { text: qsTr("Follow System"); checkable: true; checked: Theme.forced === ""; onTriggered: Theme.forced = "" }
@@ -455,6 +489,9 @@ ApplicationWindow {
             Action { text: qsTr("&About Wordloom"); onTriggered: aboutDialog.open() }
         }
     }
+
+    // Zoom In is Ctrl++ on most systems; Ctrl+= saves reaching for Shift.
+    Shortcut { sequence: "Ctrl+="; enabled: win.ws !== null; onActivated: Theme.zoomIn() }
 
     Loader {
         id: loader

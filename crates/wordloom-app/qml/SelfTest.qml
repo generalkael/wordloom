@@ -131,6 +131,63 @@ Item {
             Theme.lineHighlightColor = "#40f2c14e";
             a.text = "";
         }],
+        ["fonts and zoom", () => {
+            const a = ed().firstArea();
+            Theme.resetZoom(); Theme.lineHeight = 1.45;
+            a.text = "# The Title\nA body line\n## A part";
+        }],
+        ["fonts and zoom", () => {
+            const a = ed().firstArea(), px = Theme.editorPixelSize;
+            check(Math.abs(a.lineHeightAt(0) - 1.45) < 0.01 && Math.abs(a.lineHeightAt(a.text.indexOf("body")) - 1.45) < 0.01,
+                  "the editor uses the line spacing (" + a.lineHeightAt(0) + ")");
+            check(a.pixelSizeAt(3) === Math.round(px * 1.6) && a.pixelSizeAt(a.text.indexOf("part")) === Math.round(px * 1.35),
+                  "headings are sized from the text (" + a.pixelSizeAt(3) + ", " + a.pixelSizeAt(a.text.indexOf("part")) + " for " + px + ")");
+            check(!a.canUndo, "laying out the spacing leaves nothing to undo");
+            Theme.zoomIn();
+            check(Theme.editorZoom === 1.1 && a.font.pixelSize === Math.round(Theme.editorSize * 1.1), "Zoom In scales the text (" + Theme.zoomText + ", " + a.font.pixelSize + ")");
+            Theme.setZoom(1.5);
+        }],
+        ["fonts and zoom", () => {
+            const a = ed().firstArea();
+            check(a.pixelSizeAt(3) === Math.round(Math.round(Theme.editorSize * 1.5) * 1.6), "and the headings with it (" + a.pixelSizeAt(3) + ")");
+            input.key(win, Qt.Key_0, Qt.ControlModifier);
+            check(Theme.editorZoom === 1, "Ctrl+0 goes back to actual size (" + Theme.zoomText + ")");
+            input.key(win, Qt.Key_Equal, Qt.ControlModifier);
+            check(Theme.editorZoom === 1.1, "Ctrl+= zooms in (" + Theme.zoomText + ")");
+            Theme.resetZoom();
+            a.forceActiveFocus(); a.cursorPosition = a.length;
+            a.insert(a.length, " grows");
+            Theme.lineHeight = 2.0;
+        }],
+        ["fonts and zoom", () => {
+            const a = ed().firstArea();
+            check(Math.abs(a.lineHeightAt(0) - 2) < 0.01 && Math.abs(a.lineHeightAt(a.length) - 2) < 0.01, "changing the spacing re-lays out the open text (" + a.lineHeightAt(0) + ")");
+            a.insert(a.length, "\nA new line");
+            check(Math.abs(a.lineHeightAt(a.length) - 2) < 0.01, "new paragraphs get it too");
+            Theme.lineHeight = 1.45;
+            ws().openTextSettings();
+            check(ws().textSettingsRef().opened, "the font and spacing dialog opens");
+            ws().textSettingsRef().close();
+        }],
+        ["paragraph style", () => {
+            const a = ed().firstArea();
+            a.text = "Line one\nLine two";
+            a.forceActiveFocus(); ed().activeArea = a;
+            a.cursorPosition = a.text.indexOf("two");
+            ws().setParagraphStyle("h2");
+            check(a.text === "Line one\n## Line two" && ed().paragraphStyle === "h2", "a heading style marks the caret's line (" + JSON.stringify(a.text) + ")");
+            check(a.text.substring(a.cursorPosition, a.cursorPosition + 3) === "two", "the caret stays on its word");
+            ws().setParagraphStyle("quote");
+            check(a.text === "Line one\n> Line two" && ed().paragraphStyle === "quote", "the quote style replaces the heading (" + JSON.stringify(a.text) + ")");
+            input.key(win, Qt.Key_1, Qt.ControlModifier | Qt.AltModifier);
+            check(a.text === "Line one\n# Line two", "Ctrl+Alt+1 makes it a heading (" + JSON.stringify(a.text) + ")");
+            input.key(win, Qt.Key_0, Qt.ControlModifier | Qt.AltModifier);
+            check(a.text === "Line one\nLine two" && ed().paragraphStyle === "body", "Ctrl+Alt+0 makes it body text (" + JSON.stringify(a.text) + ")");
+            a.select(0, a.length);
+            ws().setParagraphStyle("quote");
+            check(a.text === "> Line one\n> Line two", "a quote covers every selected line (" + JSON.stringify(a.text) + ")");
+            a.text = "";
+        }],
         ["name completion", () => {
             const a = ed().firstArea();
             a.forceActiveFocus(); ed().activeArea = a;
@@ -396,6 +453,57 @@ Item {
             key(Qt.Key_End);
             key(Qt.Key_Return);
             check(ws().viewMode === "editor" && ws().current && ws().current.title === "The Keeper", "Enter on a document opens it in the editor (" + ws().viewMode + ")");
+        }],
+        ["freeform corkboard", () => { ws().select(rowId("The Storm"), "corkboard"); }],
+        ["freeform corkboard", () => {
+            const c = ws().corkboardRef();
+            c.setFreeform(true);
+        }],
+        ["freeform corkboard", () => {
+            const c = ws().corkboardRef();
+            const s0 = c.spots[c.cards[0].id], s1 = c.spots[c.cards[1].id];
+            check(c.freeform && s0 && s1 && (s0.x !== s1.x || s0.y !== s1.y), "a freeform board lays the cards out in free slots");
+            const from = c.cardGrip(0), to = from ? Qt.point(from.x + 2 * c.cardWidth, from.y + c.cardHeight) : null;
+            if (from) input.drag(win, from, to);
+        }],
+        ["freeform corkboard", () => {
+            const c = ws().corkboardRef(), titles = () => c.cards.map(x => x.title).join(",");
+            const p = c.board.positions[rowId("Arrival")];
+            check(p !== undefined && p[0] > 300 && p[1] > 100, "dragging a card puts it where it was dropped (" + JSON.stringify(p) + ")");
+            check(titles() === "Arrival,The Keeper", "without changing the binder order (" + titles() + ")");
+            c.orderBinder();
+            check(titles() === "The Keeper,Arrival", "Order Binder by Board reads the board in rows (" + titles() + ")");
+            Api.call("undo");
+            check(Api.call("undo") === "Move on Corkboard" && c.board.positions[rowId("Arrival")] === undefined, "Undo takes the move back");
+            check(c.freeform, "and leaves the board freeform");
+            c.addNote(null);
+        }],
+        ["freeform corkboard", () => {
+            const c = ws().corkboardRef(), notes = c.board.notes;
+            check(notes.length === 1 && c.items.length === c.cards.length + 1, "+ Note puts a note on the board, not in the binder");
+            const ta = c.noteEditor(notes[0].id);
+            check(ta !== null && ta.activeFocus, "the new note is ready to type in (" + (ta ? "focus " + ta.activeFocus : "no editor") + ")");
+            if (ta) { ta.insert(0, "Storm rips the lamp glass"); c.focusBoard(); }
+        }],
+        ["freeform corkboard", () => {
+            const c = ws().corkboardRef(), n = c.board.notes[0];
+            check(n && n.text === "Storm rips the lamp glass", "the note's text is saved (" + (n ? n.text : "") + ")");
+            const before = c.cards.length;
+            const id = c.noteToDocument(n.id);
+            check(id && c.cards.length === before + 1 && c.board.notes.length === 0, "Make into Document adds it to the binder");
+            check(JSON.stringify(c.board.positions[id]) === JSON.stringify([n.x, n.y]), "in the note's place on the board");
+            Api.call("undo");
+            check(c.board.notes.length === 1 && c.cards.length === before, "Undo turns it back into a note");
+            c.keyId = c.board.notes[0].id;
+            c.focusBoard();
+            input.key(win, Qt.Key_Delete);
+            check(c.board.notes.length === 0, "Delete removes a highlighted note");
+            c.setBoardColor("#3f6b4e");
+            check(Qt.colorEqual(c.color, "#3f6b4e") && !c.boardIsLight, "the board takes the chosen colour (" + c.color + ")");
+            Api.call("undo");
+            check(Qt.colorEqual(c.color, Theme.cork), "Undo brings back the cork colour");
+            c.setFreeform(false);
+            check(!c.freeform, "the board goes back to a grid");
         }],
         ["outliner", () => {
             Api.call("setField", rowId("Arrival"), "field:POV", "Mara");

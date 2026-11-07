@@ -1357,6 +1357,166 @@ impl Session {
         Ok(())
     }
 
+    // ----- corkboard -----------------------------------------------------
+
+    /// A folder's board: whether it is freeform, where its cards were put
+    /// (only cards still in the folder), its notes and the board colour.
+    pub fn board(&self, container: &str) -> Result<Value> {
+        let p = &self.project;
+        let cid = parse_id(container)?;
+        let kids = &p.node(cid)?.children;
+        let b = p.boards.board(cid);
+        let positions: serde_json::Map<String, Value> = b
+            .map(|b| {
+                b.positions
+                    .iter()
+                    .filter(|(id, _)| kids.contains(id))
+                    .map(|(id, q)| (id.to_string(), json!(q)))
+                    .collect()
+            })
+            .unwrap_or_default();
+        Ok(json!({
+            "freeform": b.is_some_and(|b| b.freeform),
+            "positions": positions,
+            "notes": b.map(|b| b.notes.clone()).unwrap_or_default(),
+            "color": p.boards.color,
+        }))
+    }
+
+    pub fn set_board_color(&mut self, color: &str) -> Result<()> {
+        self.project.boards.set_color(color)?;
+        self.changed();
+        Ok(())
+    }
+
+    pub fn set_board_freeform(&mut self, container: &str, on: bool) -> Result<()> {
+        let cid = parse_id(container)?;
+        self.project.node(cid)?;
+        self.project.boards.set_freeform(cid, on);
+        self.changed();
+        Ok(())
+    }
+
+    /// Put a card (a binder item in the folder, or a note) at a spot on the
+    /// folder's freeform board.
+    pub fn place_on_board(&mut self, container: &str, card: &str, x: f64, y: f64) -> Result<()> {
+        let (cid, card) = (parse_id(container)?, parse_id(card)?);
+        if self.project.node(cid)?.children.contains(&card) {
+            self.project.boards.place(cid, card, x, y)?;
+        } else {
+            self.project.boards.move_note(cid, card, x, y)?;
+        }
+        self.changed();
+        Ok(())
+    }
+
+    pub fn tidy_board(&mut self, container: &str) -> Result<()> {
+        let cid = parse_id(container)?;
+        self.project.node(cid)?;
+        self.project.boards.tidy(cid);
+        self.changed();
+        Ok(())
+    }
+
+    /// Put the folder's children in the given order (Order Binder by
+    /// Board: the order the freeform board reads in). `ids` must be exactly
+    /// the folder's children.
+    pub fn order_children(&mut self, container: &str, ids: &[String]) -> Result<()> {
+        let cid = parse_id(container)?;
+        let order = ids
+            .iter()
+            .map(|s| parse_id(s))
+            .collect::<Result<Vec<NodeId>>>()?;
+        let kids = &self.project.node(cid)?.children;
+        let mut a = order.clone();
+        let mut b = kids.clone();
+        a.sort();
+        b.sort();
+        if a != b {
+            return Err(Error::Invalid(
+                "the new order must have exactly the folder's items".into(),
+            ));
+        }
+        self.project.node_mut(cid)?.children = order;
+        self.changed();
+        Ok(())
+    }
+
+    pub fn add_board_note(
+        &mut self,
+        container: &str,
+        x: f64,
+        y: f64,
+        text: &str,
+    ) -> Result<String> {
+        let cid = parse_id(container)?;
+        self.project.node(cid)?;
+        let id = self.project.boards.add_note(cid, x, y, text)?;
+        self.changed();
+        Ok(id.to_string())
+    }
+
+    pub fn update_board_note(
+        &mut self,
+        container: &str,
+        note: &str,
+        title: &str,
+        text: &str,
+    ) -> Result<()> {
+        self.project
+            .boards
+            .update_note(parse_id(container)?, parse_id(note)?, title, text)?;
+        self.changed();
+        Ok(())
+    }
+
+    pub fn color_board_note(&mut self, container: &str, note: &str, color: &str) -> Result<()> {
+        self.project
+            .boards
+            .color_note(parse_id(container)?, parse_id(note)?, color)?;
+        self.changed();
+        Ok(())
+    }
+
+    pub fn remove_board_note(&mut self, container: &str, note: &str) -> Result<()> {
+        self.project
+            .boards
+            .remove_note(parse_id(container)?, parse_id(note)?)?;
+        self.changed();
+        Ok(())
+    }
+
+    /// Turn a note into a binder item at the end of the folder, keeping its
+    /// spot on the board: its title (or first words) becomes the title and
+    /// its text the synopsis. Returns the new item's id.
+    pub fn board_note_to_item(&mut self, container: &str, note: &str) -> Result<String> {
+        let cid = parse_id(container)?;
+        let section = self.project.section_of(cid)?;
+        if section == RootRole::Trash {
+            return Err(Error::Invalid(
+                "notes in the Trash can't become documents".into(),
+            ));
+        }
+        let n = self.project.boards.remove_note(cid, parse_id(note)?)?;
+        let title = if n.title.is_empty() {
+            let words: Vec<&str> = n.text.split_whitespace().take(6).collect();
+            if words.is_empty() {
+                "Untitled".to_string()
+            } else {
+                words.join(" ")
+            }
+        } else {
+            n.title.clone()
+        };
+        let id = self
+            .project
+            .add_node(cid, None, section.child_kind(), &title)?;
+        self.project.node_mut(id)?.synopsis = n.text.trim().to_string();
+        self.project.boards.place(cid, id, n.x, n.y)?;
+        self.changed();
+        Ok(id.to_string())
+    }
+
     // ----- timeline -------------------------------------------------------
 
     pub fn timeline(&self) -> Value {

@@ -28,11 +28,29 @@ QtObject {
     readonly property color paper: dark ? "#25272b" : "#fffefb"
     readonly property color ink: dark ? "#dcd9d2" : "#1d1c19"
 
+    // The writing font (View ▸ Editor Font & Spacing…). If it isn't
+    // installed, Qt substitutes a similar one.
     property string editorFont: "Georgia"
+    readonly property string defaultEditorFont: "Georgia"
     property int editorSize: 15
     // Text column width in pixels; 0 = fit the editor pane (the default).
     property int pageWidth: 0
+    // Line spacing, as a multiple of single spacing (editor and preview).
     property real lineHeight: 1.45
+    // Editor zoom (Ctrl+= / Ctrl+− / Ctrl+0, Ctrl+wheel): scales the text
+    // and a fixed page width without changing the font size itself.
+    property real editorZoom: 1.0
+    readonly property var zoomSteps: [0.5, 0.67, 0.75, 0.8, 0.9, 1.0, 1.1, 1.25, 1.5, 1.75, 2.0, 2.5, 3.0]
+    readonly property real minZoom: 0.5
+    readonly property real maxZoom: 3.0
+    // What the editor actually draws at.
+    readonly property int editorPixelSize: Math.max(6, Math.round(editorSize * editorZoom))
+    function setZoom(z) { editorZoom = Math.round(Math.max(minZoom, Math.min(maxZoom, z)) * 100) / 100; }
+    // The next step up or down from the current zoom.
+    function zoomIn() { const z = zoomSteps.find(s => s > editorZoom + 0.001); setZoom(z === undefined ? maxZoom : z); }
+    function zoomOut() { const z = zoomSteps.slice().reverse().find(s => s < editorZoom - 0.001); setZoom(z === undefined ? minZoom : z); }
+    function resetZoom() { editorZoom = 1.0; }
+    readonly property string zoomText: Math.round(editorZoom * 100) + "%"
     // Show Markdown styling (bold, headings, quotes…) while editing.
     property bool styledMarkdown: true
     // Underline misspelled words in the editor.
@@ -55,6 +73,8 @@ QtObject {
         property alias editorFont: theme.editorFont
         property alias editorSize: theme.editorSize
         property alias pageWidth: theme.pageWidth
+        property alias lineHeight: theme.lineHeight
+        property alias editorZoom: theme.editorZoom
         property alias styledMarkdown: theme.styledMarkdown
         property alias spellCheck: theme.spellCheck
         property alias spellLanguage: theme.spellLanguage

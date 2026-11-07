@@ -225,6 +225,9 @@ pub struct Project {
     /// Character relationships and their map layout.
     #[serde(default)]
     pub relations: crate::relations::Relations,
+    /// Corkboard layouts, notes and colour.
+    #[serde(default)]
+    pub boards: crate::boards::Boards,
     #[serde(default)]
     pub stats: WritingStats,
     #[serde(skip)]
@@ -270,6 +273,7 @@ impl Project {
             statuses: Vec::new(),
             timeline: Timeline::default(),
             relations: Default::default(),
+            boards: Default::default(),
             stats: WritingStats::default(),
             contents: HashMap::new(),
         };
@@ -538,6 +542,7 @@ impl Project {
             self.contents.remove(id);
             self.timeline.forget_node(*id);
             self.relations.forget_node(*id);
+            self.boards.forget_node(*id);
         }
         self.touch();
         removed

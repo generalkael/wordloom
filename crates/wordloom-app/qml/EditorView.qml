@@ -31,6 +31,8 @@ Rectangle {
     signal openRequested(string id)
     signal swapRequested()
     signal closeRequested()
+    // The font / spacing button (Workspace opens the dialog).
+    signal textSettingsRequested()
     // The user started typing in (or clicked into) this editor.
     signal editorFocused()
     // The caret moved in one of the documents (for Back / Forward).
@@ -86,6 +88,51 @@ Rectangle {
         const next = level >= 3 ? 0 : level + 1;
         if (next) a.insert(ls, "#".repeat(next) + " ");
         a.cursorPosition = ls + Math.max(0, keep) + (next ? next + 1 : 0);
+    }
+    // The caret line's paragraph style: "body", "h1" … "h6" or "quote".
+    property string paragraphStyle: "body"
+    function updateParagraphStyle() {
+        const a = activeArea;
+        if (!a) { paragraphStyle = "body"; return; }
+        const ls = lineStart(a.text, a.cursorPosition);
+        const line = a.text.substring(ls, ls + 8);
+        const m = /^(#{1,6}) /.exec(line);
+        paragraphStyle = m ? "h" + m[1].length : line.startsWith(">") ? "quote" : "body";
+    }
+    readonly property var paragraphStyles: [
+        { id: "body", name: qsTr("Body Text"), key: "Ctrl+Alt+0" },
+        { id: "h1", name: qsTr("Heading 1"), key: "Ctrl+Alt+1" },
+        { id: "h2", name: qsTr("Heading 2"), key: "Ctrl+Alt+2" },
+        { id: "h3", name: qsTr("Heading 3"), key: "Ctrl+Alt+3" },
+        { id: "quote", name: qsTr("Block Quote"), key: "Ctrl+Alt+Q" }
+    ]
+    // Give the caret's line (every line the selection touches, for quotes
+    // and body text) a paragraph style, replacing its heading or quote marks.
+    function setParagraphStyle(style) {
+        const a = activeArea;
+        if (!a) return;
+        const t = a.text;
+        const starts = [];
+        const from = style.startsWith("h") ? a.cursorPosition : a.selectionStart;
+        const to = style.startsWith("h") ? a.cursorPosition : a.selectionEnd;
+        for (let i = lineStart(t, from); i <= to; i = t.indexOf("\n", i) + 1) {
+            starts.push(i);
+            if (t.indexOf("\n", i) < 0) break;
+        }
+        const caret = a.cursorPosition;
+        let shift = 0;
+        for (let k = starts.length - 1; k >= 0; --k) {
+            const i = starts[k];
+            const m = /^(#{1,6} |> ?)/.exec(t.substring(i, i + 8));
+            const old = m ? m[0] : "";
+            const add = style === "quote" ? "> " : style.startsWith("h") ? "#".repeat(Number(style[1])) + " " : "";
+            if (old === add) continue;
+            if (old) a.remove(i, i + old.length);
+            if (add) a.insert(i, add);
+            if (i <= caret) shift += add.length - old.length;
+        }
+        a.cursorPosition = Math.max(starts[0], Math.min(a.text.length, caret + shift));
+        updateParagraphStyle();
     }
     // Quote or unquote every line the selection touches.
     function toggleQuote() {
@@ -505,6 +552,19 @@ Rectangle {
                 Label { text: ev.node ? ev.node.title : ""; font.bold: true; color: Theme.text; elide: Text.ElideRight; Layout.fillWidth: true; Layout.minimumWidth: 40 }
                 Label { visible: ev.docs.length > 1 && !header.compact; text: qsTr("Composite · %1 parts").arg(ev.docs.length); color: Theme.subtext }
                 ToolButton { visible: ev.hasFile; text: qsTr("Open in Default App"); onClicked: fileViewer.openExternally() }
+                // Paragraph style of the caret's line.
+                ComboBox {
+                    id: styleBox
+                    visible: !ev.hasFile && !ev.preview && !header.compact
+                    Layout.preferredWidth: 132
+                    focusPolicy: Qt.NoFocus
+                    enabled: ev.activeArea !== null
+                    model: ev.paragraphStyles.map(p => p.name)
+                    currentIndex: ev.paragraphStyles.findIndex(p => p.id === ev.paragraphStyle)
+                    onActivated: (i) => ev.setParagraphStyle(ev.paragraphStyles[i].id)
+                    ToolTip.visible: hovered
+                    ToolTip.text: qsTr("Paragraph style (Ctrl+Alt+0 body, Ctrl+Alt+1–3 headings, Ctrl+Alt+Q quote)")
+                }
                 // Format bar
                 Repeater {
                     model: ev.hasFile || ev.preview || header.tiny ? [] : [
@@ -530,8 +590,23 @@ Rectangle {
                 ToolSeparator { visible: !ev.hasFile && !ev.preview && !header.tiny }
                 ToolButton { visible: !ev.hasFile && !header.compact; text: qsTr("Preview"); checkable: true; checked: ev.preview; onToggled: { ev.flush(); ev.preview = checked; } ToolTip.visible: hovered; ToolTip.text: qsTr("Render Markdown formatting") }
                 ToolButton { visible: !ev.hasFile && !header.compact; text: qsTr("Typewriter"); checkable: true; checked: ev.typewriter; onToggled: ev.typewriter = checked; ToolTip.visible: hovered; ToolTip.text: qsTr("Keep the current line centred") }
-                ToolButton { visible: !ev.hasFile && !header.compact; text: "A−"; onClicked: Theme.editorSize = Math.max(9, Theme.editorSize - 1) }
-                ToolButton { visible: !ev.hasFile && !header.compact; text: "A+"; onClicked: Theme.editorSize = Math.min(40, Theme.editorSize + 1) }
+                ToolButton {
+                    visible: !ev.hasFile && !header.compact
+                    text: "Aa"
+                    focusPolicy: Qt.NoFocus
+                    onClicked: ev.textSettingsRequested()
+                    ToolTip.visible: hovered
+                    ToolTip.text: qsTr("Font, size and line spacing: %1, %2 px, %3×").arg(Theme.editorFont).arg(Theme.editorSize).arg(Theme.lineHeight)
+                }
+                ToolButton {
+                    id: zoomButton
+                    visible: !ev.hasFile && !header.compact
+                    text: Theme.zoomText
+                    focusPolicy: Qt.NoFocus
+                    onClicked: zoomMenu.popup(zoomButton, 0, zoomButton.height)
+                    ToolTip.visible: hovered && !zoomMenu.visible
+                    ToolTip.text: qsTr("Zoom (Ctrl+= / Ctrl+− / Ctrl+0, or Ctrl+wheel)")
+                }
                 ToolButton {
                     visible: !ev.hasFile && !header.compact; text: "⇔"
                     // Fit → 560 → 740 → 920 → 1100 → Fit
@@ -559,11 +634,44 @@ Rectangle {
                         MenuItem { text: qsTr("Preview"); checkable: true; checked: ev.preview; onTriggered: { ev.flush(); ev.preview = !ev.preview; } }
                         MenuItem { text: qsTr("Typewriter Scrolling"); checkable: true; checked: ev.typewriter; onTriggered: ev.typewriter = !ev.typewriter }
                         MenuSeparator {}
-                        MenuItem { text: qsTr("Larger Text"); onTriggered: Theme.editorSize = Math.min(40, Theme.editorSize + 1) }
-                        MenuItem { text: qsTr("Smaller Text"); onTriggered: Theme.editorSize = Math.max(9, Theme.editorSize - 1) }
+                        MenuItem { visible: !ev.preview; height: visible ? implicitHeight : 0; text: qsTr("Paragraph Style: %1…").arg(ev.paragraphStyles.find(p => p.id === ev.paragraphStyle).name); enabled: ev.activeArea !== null; onTriggered: styleMenu.popup() }
+                        MenuItem { text: qsTr("Font & Spacing…"); onTriggered: ev.textSettingsRequested() }
+                        MenuItem { text: qsTr("Zoom In (%1)").arg(Theme.zoomText); onTriggered: Theme.zoomIn() }
+                        MenuItem { text: qsTr("Zoom Out"); onTriggered: Theme.zoomOut() }
+                        MenuItem { text: qsTr("Actual Size"); enabled: Theme.editorZoom !== 1; onTriggered: Theme.resetZoom() }
                         MenuItem {
                             text: Theme.pageWidth === 0 ? qsTr("Page Width: Fit (click to change)") : qsTr("Page Width: %1 px (click to change)").arg(Theme.pageWidth)
                             onTriggered: Theme.pageWidth = Theme.pageWidth === 0 ? 560 : Theme.pageWidth >= 1100 ? 0 : Theme.pageWidth + 180
+                        }
+                    }
+                }
+                Menu {
+                    id: zoomMenu
+                    MenuItem { text: qsTr("Zoom In"); onTriggered: Theme.zoomIn() }
+                    MenuItem { text: qsTr("Zoom Out"); onTriggered: Theme.zoomOut() }
+                    MenuItem { text: qsTr("Actual Size"); onTriggered: Theme.resetZoom() }
+                    MenuSeparator {}
+                    Repeater {
+                        model: [0.75, 0.9, 1.0, 1.1, 1.25, 1.5, 2.0]
+                        delegate: MenuItem {
+                            required property real modelData
+                            text: Math.round(modelData * 100) + "%"
+                            checkable: true
+                            checked: Math.abs(Theme.editorZoom - modelData) < 0.001
+                            onTriggered: Theme.setZoom(modelData)
+                        }
+                    }
+                }
+                Menu {
+                    id: styleMenu
+                    Repeater {
+                        model: ev.paragraphStyles
+                        delegate: MenuItem {
+                            required property var modelData
+                            text: modelData.name
+                            checkable: true
+                            checked: ev.paragraphStyle === modelData.id
+                            onTriggered: ev.setParagraphStyle(modelData.id)
                         }
                     }
                 }
@@ -653,11 +761,24 @@ Rectangle {
                 width: scroller.width - 14
                 height: page.height + 48
 
+                // Ctrl+wheel zooms (one step per notch; touchpads add up).
+                WheelHandler {
+                    acceptedModifiers: Qt.ControlModifier
+                    property real acc: 0
+                    onWheel: (e) => {
+                        acc += e.angleDelta.y;
+                        while (acc >= 120) { Theme.zoomIn(); acc -= 120; }
+                        while (acc <= -120) { Theme.zoomOut(); acc += 120; }
+                        e.accepted = true;
+                    }
+                }
+
                 Rectangle {
                     id: page
                     // Fills the pane unless a fixed page width is chosen (⇔). In focus
                     // mode "fit" keeps a readable column instead of the whole screen.
-                    width: Theme.pageWidth > 0 ? Math.min(Theme.pageWidth + 2 * pad, parent.width - 24)
+                    // A fixed width grows and shrinks with the zoom.
+                    width: Theme.pageWidth > 0 ? Math.min(Theme.pageWidth * Theme.editorZoom + 2 * pad, parent.width - 24)
                         : ev.focusMode ? Math.min(860 + 2 * pad, parent.width - 24)
                         : parent.width - 24
                     // At least as tall as the visible area, so the paper fills the pane.
@@ -823,6 +944,7 @@ Rectangle {
             loading = true;
             saved = Api.get("text", "", docId);
             area.text = saved;
+            styler.applyLayout();   // line spacing (replacing the text resets it)
             loading = false;
         }
         function flush() {
@@ -842,7 +964,7 @@ Rectangle {
         function syncFromStore() {
             if (area.activeFocus || saveTimer.running) return;
             const t = Api.get("text", "", docId);
-            if (t !== saved) { loading = true; saved = t; area.text = t; loading = false; }
+            if (t !== saved) { loading = true; saved = t; area.text = t; styler.applyLayout(); loading = false; }
         }
 
         // Section heading between parts in composite mode.
@@ -865,6 +987,8 @@ Rectangle {
         TextArea {
             id: area
             function tintAt(pos) { return styler.backgroundAt(pos); }
+            function lineHeightAt(pos) { return styler.lineHeightAt(pos); }
+            function pixelSizeAt(pos) { return styler.pixelSizeAt(pos); }
             visible: !ev.preview && !(de.composite && de.isFolder && text.length === 0 && !activeFocus)
             Layout.fillWidth: true
             wrapMode: TextEdit.Wrap
@@ -872,7 +996,7 @@ Rectangle {
             selectByMouse: true
             persistentSelection: true
             font.family: Theme.editorFont
-            font.pixelSize: Theme.editorSize
+            font.pixelSize: Theme.editorPixelSize
             color: Theme.ink
             selectionColor: Theme.selection
             selectedTextColor: Theme.ink
@@ -933,6 +1057,8 @@ Rectangle {
                 id: styler
                 document: area.textDocument
                 enabled: Theme.styledMarkdown
+                baseSize: Theme.editorPixelSize
+                lineHeight: Theme.lineHeight
                 spellCheck: Theme.spellCheck
                 repeats: Theme.highlightRepeats
                 repeatColor: Theme.dark ? Qt.rgba(0.35, 0.6, 1, 0.26) : Qt.rgba(0.3, 0.55, 0.95, 0.22)
@@ -945,6 +1071,7 @@ Rectangle {
                 if (activeFocus || ev.activeArea === area) ev.caretMoved(de.docId, cursorPosition);
                 if (!activeFocus) return;
                 ev.activeCursor = cursorPosition;
+                ev.updateParagraphStyle();
                 // Moving away (click, arrow keys) closes the suggestions.
                 if (ev.completionArea === area && (cursorPosition < ev.completionStart || ev.isLetter(text[cursorPosition]))) ev.hideCompletion();
             }
@@ -960,7 +1087,7 @@ Rectangle {
             textFormat: Text.MarkdownText
             wrapMode: Text.Wrap
             font.family: Theme.editorFont
-            font.pixelSize: Theme.editorSize
+            font.pixelSize: Theme.editorPixelSize
             color: Theme.ink
             lineHeight: Theme.lineHeight
         }

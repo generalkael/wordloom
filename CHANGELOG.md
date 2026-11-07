@@ -5,6 +5,21 @@ Notable changes to Wordloom. Each entry lands in the same commit as the change i
 ## Unreleased
 
 ### Added
+- **Freeform corkboards.** Switch a board from *Grid* to *Freeform* and cards stay wherever you
+  drop them, without changing the binder. *Arrange ▾* ▸ *Tidy Up* puts them back in slots and
+  *Order Binder by Board* reorders the folder to match the board (rows, left to right). Ctrl+arrows
+  nudge the highlighted card.
+- **Corkboard notes.** *+ Note* (or double-click a freeform board) pins a sticky note that lives
+  only on that board, not in the binder, with a title, text and one of five colours. *Make into
+  Document* turns a note into a binder item in the same spot.
+- **Corkboard colour.** The swatch on the board's bar picks Cork, Walnut, Slate, Felt Green, Navy,
+  Burgundy, Linen, Whiteboard or a custom colour for the project's boards.
+- **Editor font & spacing.** *Aa* on the editor bar (View ▸ Editor Font & Spacing…) chooses the
+  writing font from the installed fonts, its size and the line spacing, with a live sample.
+- **Editor zoom.** 50–300% from the % button, Ctrl+= / Ctrl+− / Ctrl+0 or Ctrl+scroll, separate from
+  the font size; a fixed page width zooms too.
+- **Paragraph styles.** A style box on the format bar (and Edit ▸ Paragraph Style, Ctrl+Alt+0–3 and
+  Ctrl+Alt+Q) shows and sets the caret line's style: body text, heading 1–3 or block quote.
 - **Project-wide undo and redo.** ↶/↷ on the toolbar, Edit ▸ Undo/Redo, and Ctrl+Z / Ctrl+Shift+Z
   outside text boxes reverse binder moves, renames, trash and empty trash, replace-all, metadata,
   labels, targets, file imports and every timeline edit. The menu names the step. Typing keeps
@@ -188,6 +203,9 @@ Notable changes to Wordloom. Each entry lands in the same commit as the change i
   start screen and New Document once a project is open.
 
 ### Changed
+- The editor now uses the line spacing (it was only used by the preview), and headings are sized
+  from the text (1.6×, 1.35×, 1.15×) so they follow font size and zoom. View ▸ Larger / Smaller
+  Text became View ▸ Zoom; the A− / A+ buttons became *Aa* and the zoom button.
 - The **Inspector** is now called the **Details** panel (toolbar: Show/Hide Details; View ▸ Show
   Details, still Ctrl+Alt+I).
 - Binder, corkboard, outliner, editor and timeline icons are bundled SVGs instead of emoji, so they

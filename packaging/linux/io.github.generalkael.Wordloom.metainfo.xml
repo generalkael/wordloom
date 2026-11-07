@@ -15,7 +15,7 @@
       It compiles the manuscript to EPUB, DOCX, HTML, Markdown or plain text.
     </p>
     <ul>
-      <li>Binder, corkboard, outliner and a split editor with styled Markdown</li>
+      <li>Binder, corkboard (grid or freeform, with sticky notes), outliner and a split editor with styled Markdown</li>
       <li>Story timeline with dependencies, conflict detection and swim lanes</li>
       <li>Character relationship map and character / place sheets</li>
       <li>Research files: images and PDFs inside the project</li>

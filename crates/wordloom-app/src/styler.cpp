@@ -8,6 +8,8 @@
 
 #include <QRegularExpression>
 #include <QTextBlock>
+#include <QTextCursor>
+#include <QTimer>
 #include <QTextCharFormat>
 #include <QTextLayout>
 #include <QTextDocument>
@@ -145,7 +147,10 @@ void MarkdownHighlighter::highlightBlock(const QString &text)
     if (h.hasMatch()) {
         const int level = int(h.capturedLength(1));
         base.setFontWeight(QFont::Bold);
-        base.setProperty(QTextFormat::FontSizeAdjustment, level == 1 ? 2 : level == 2 ? 1 : 0);
+        // Sized from the body text (so they follow zoom): # 1.6×, ## 1.35×,
+        // ### 1.15×, deeper levels body size.
+        static const double scale[] = { 1.6, 1.35, 1.15, 1.0, 1.0, 1.0 };
+        base.setProperty(QTextFormat::FontPixelSize, int(baseSize * scale[level - 1] + 0.5));
         setFormat(0, int(text.size()), base);
         QTextCharFormat m = base;
         m.setForeground(markColor);
@@ -301,7 +306,31 @@ void MarkdownStyler::setDocument(QQuickTextDocument *document)
         return;
     m_document = document;
     attach();
+    watchDocument();
+    layoutBlocks();
     Q_EMIT documentChanged();
+}
+
+// Replacing the text (TextEdit.text = …) resets every paragraph's format and
+// empties the undo history. Shortly after any change with an empty history,
+// the spacing is put back; once there is history, typing has inherited it.
+void MarkdownStyler::watchDocument()
+{
+    QObject::disconnect(m_contentsConnection);
+    QTextDocument *doc = m_document ? m_document->textDocument() : nullptr;
+    if (!doc)
+        return;
+    m_contentsConnection = connect(doc, &QTextDocument::contentsChange, this, [this]() {
+        if (m_layoutQueued)
+            return;
+        m_layoutQueued = true;
+        QTimer::singleShot(0, this, [this]() {
+            m_layoutQueued = false;
+            QTextDocument *d = m_document ? m_document->textDocument() : nullptr;
+            if (d && d->availableUndoSteps() == 0)
+                layoutBlocks();
+        });
+    });
 }
 
 void MarkdownStyler::setMarkColor(const QColor &c)
@@ -367,6 +396,89 @@ void MarkdownStyler::setRepeatColor(const QColor &c)
     Q_EMIT repeatColorChanged();
 }
 
+void MarkdownStyler::setBaseSize(int px)
+{
+    if (m_baseSize == px || px <= 0)
+        return;
+    m_baseSize = px;
+    attach();
+    Q_EMIT baseSizeChanged();
+}
+
+void MarkdownStyler::setLineHeight(qreal h)
+{
+    h = std::clamp(h, 0.8, 3.0);
+    if (qFuzzyCompare(m_lineHeight, h))
+        return;
+    m_lineHeight = h;
+    layoutBlocks();
+    Q_EMIT lineHeightChanged();
+}
+
+void MarkdownStyler::applyLayout()
+{
+    layoutBlocks();
+}
+
+// Block formats are part of the document, so setting them adds undo steps
+// that would "undo" the spacing, and Qt can't set them outside the undo
+// history. So only paragraphs that lack the spacing change, and the history
+// is cleared after: right after the text was loaded it is empty anyway;
+// when the setting changes mid-edit, undoing past it would bring the old
+// spacing back paragraph by paragraph. New paragraphs inherit the format,
+// so typing never needs this.
+void MarkdownStyler::layoutBlocks()
+{
+    QTextDocument *doc = m_document ? m_document->textDocument() : nullptr;
+    if (!doc)
+        return;
+    const int height = int(m_lineHeight * 100 + 0.5);
+    bool changed = false;
+    QTextCursor cursor(doc);
+    for (QTextBlock b = doc->begin(); b.isValid(); b = b.next()) {
+        const QTextBlockFormat f = b.blockFormat();
+        if (f.lineHeightType() == QTextBlockFormat::ProportionalHeight && int(f.lineHeight() + 0.5) == height)
+            continue;
+        if (!changed) {
+            cursor.beginEditBlock();
+            changed = true;
+        }
+        QTextBlockFormat nf = f;
+        nf.setLineHeight(height, QTextBlockFormat::ProportionalHeight);
+        cursor.setPosition(b.position());
+        cursor.setBlockFormat(nf);
+    }
+    if (!changed)
+        return;
+    cursor.endEditBlock();
+    doc->clearUndoRedoStacks();
+}
+
+qreal MarkdownStyler::lineHeightAt(int position) const
+{
+    QTextDocument *doc = m_document ? m_document->textDocument() : nullptr;
+    if (!doc)
+        return 0;
+    const QTextBlockFormat f = doc->findBlock(position).blockFormat();
+    return f.lineHeightType() == QTextBlockFormat::ProportionalHeight ? f.lineHeight() / 100.0 : 1.0;
+}
+
+int MarkdownStyler::pixelSizeAt(int position) const
+{
+    QTextDocument *doc = m_document ? m_document->textDocument() : nullptr;
+    if (!doc)
+        return 0;
+    const QTextBlock block = doc->findBlock(position);
+    if (!block.isValid() || !block.layout())
+        return 0;
+    const int at = position - block.position();
+    for (const QTextLayout::FormatRange &r : block.layout()->formats()) {
+        if (at >= r.start && at < r.start + r.length && r.format.hasProperty(QTextFormat::FontPixelSize))
+            return r.format.intProperty(QTextFormat::FontPixelSize);
+    }
+    return 0;
+}
+
 QColor MarkdownStyler::backgroundAt(int position) const
 {
     QTextDocument *doc = m_document ? m_document->textDocument() : nullptr;
@@ -411,6 +523,7 @@ void MarkdownStyler::attach()
     m_highlighter->commentTint = m_commentColor;
     m_highlighter->repeats = m_repeats;
     m_highlighter->repeatTint = m_repeatColor;
+    m_highlighter->baseSize = m_baseSize;
     m_highlighter->rehighlight();
 }
 

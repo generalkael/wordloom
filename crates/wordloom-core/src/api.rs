@@ -117,6 +117,7 @@ const READ_ONLY: &[&str] = &[
     "snapshots",
     "compareSnapshots",
     "relations",
+    "board",
     "spellSuggest",
     "spellCheck",
     "spellAdd",
@@ -186,6 +187,22 @@ fn undo_label(method: &str, a: &Args) -> Option<(String, Option<String>)> {
         "placeOnMap" => {
             return Some(("Move on Map".into(), Some(format!("map:{}", a.str(0)))));
         }
+        "placeOnBoard" => {
+            return Some((
+                "Move on Corkboard".into(),
+                Some(format!("board:{}:{}", a.str(0), a.str(1))),
+            ));
+        }
+        "updateBoardNote" => {
+            return Some(("Edit Note".into(), Some(format!("note:{}", a.str(1)))));
+        }
+        "setBoardColor" => "Corkboard Colour",
+        "tidyBoard" => "Tidy Up Corkboard",
+        "orderChildren" => "Order by Corkboard",
+        "addBoardNote" => "Add Note",
+        "colorBoardNote" => "Note Colour",
+        "removeBoardNote" => "Delete Note",
+        "boardNoteToItem" => "Make Note a Document",
         "move" | "dropOn" | "shift" => "Move",
         "moveMany" => return Some((format!("Move {} Items", a.strs(0).len()), None)),
         "indent" => "Indent",
@@ -530,6 +547,32 @@ impl App {
             "reverseRelation" => unit(self.s()?.reverse_relation(a.str(0)))?,
             "removeRelation" => unit(self.s()?.remove_relation(a.str(0)))?,
             "placeOnMap" => unit(self.s()?.place_on_map(a.str(0), a.float(1), a.float(2)))?,
+            // --- corkboard ---
+            "board" => self.s()?.board(a.str(0))?,
+            "setBoardColor" => unit(self.s()?.set_board_color(a.str(0)))?,
+            "setBoardFreeform" => unit(self.s()?.set_board_freeform(a.str(0), a.bool(1)))?,
+            "placeOnBoard" => {
+                unit(
+                    self.s()?
+                        .place_on_board(a.str(0), a.str(1), a.float(2), a.float(3)),
+                )?
+            }
+            "tidyBoard" => unit(self.s()?.tidy_board(a.str(0)))?,
+            "orderChildren" => unit(self.s()?.order_children(a.str(0), &a.strs(1)))?,
+            "addBoardNote" => {
+                json!(self
+                    .s()?
+                    .add_board_note(a.str(0), a.float(1), a.float(2), a.str(3))?)
+            }
+            "updateBoardNote" => {
+                unit(
+                    self.s()?
+                        .update_board_note(a.str(0), a.str(1), a.str(2), a.str(3)),
+                )?
+            }
+            "colorBoardNote" => unit(self.s()?.color_board_note(a.str(0), a.str(1), a.str(2)))?,
+            "removeBoardNote" => unit(self.s()?.remove_board_note(a.str(0), a.str(1)))?,
+            "boardNoteToItem" => json!(self.s()?.board_note_to_item(a.str(0), a.str(1))?),
             "compareSnapshots" => self.s()?.compare_snapshots(a.str(0), a.str(1), a.str(2))?,
             "takeSnapshot" => json!(self.s()?.take_snapshot(a.str(0), a.str(1))?),
             "restoreSnapshot" => unit(self.s()?.restore_snapshot(a.str(0), a.str(1)))?,
@@ -647,6 +690,91 @@ mod tests {
         assert!(app.call("bogus", "").json.contains("unknown method"));
         ok(&app.call("close", ""));
         assert_eq!(ok(&app.call("recent", ""))[0]["title"], "Book");
+    }
+
+    #[test]
+    fn corkboard_through_the_api() {
+        let tmp = tempfile::tempdir().unwrap();
+        let mut app = App::new(tmp.path().join("recent.json"));
+        let url = url::Url::from_file_path(tmp.path()).unwrap().to_string();
+        ok(&app.call("newProject", &json!([url, "Book", "Me"]).to_string()));
+        let ms = ok(&app.call("rootId", r#"["manuscript"]"#));
+        let a = ok(&app.call("add", &json!([ms, "folder", "A", true]).to_string()));
+        let b = ok(&app.call("add", &json!([ms, "folder", "B", true]).to_string()));
+        let board = |app: &mut App| ok(&app.call("board", &json!([ms]).to_string()));
+        assert_eq!(board(&mut app)["freeform"], false);
+        assert_eq!(board(&mut app)["color"], Value::Null);
+        assert!(!app.call("board", &json!([ms]).to_string()).mutated);
+
+        // Freeform: place B left of A, then order the binder to match.
+        ok(&app.call("setBoardFreeform", &json!([ms, true]).to_string()));
+        ok(&app.call("placeOnBoard", &json!([ms, a, 300, 0]).to_string()));
+        ok(&app.call("placeOnBoard", &json!([ms, a, 400, 10]).to_string()));
+        ok(&app.call("placeOnBoard", &json!([ms, b, 0, 20]).to_string()));
+        assert_eq!(
+            board(&mut app)["positions"][a.as_str().unwrap()],
+            json!([400.0, 10.0])
+        );
+        let chapter = ok(&app.call("children", &json!([ms]).to_string()))[0]["id"].clone();
+        assert!(app
+            .call("orderChildren", &json!([ms, [b, a]]).to_string())
+            .json
+            .contains("exactly"));
+        ok(&app.call("orderChildren", &json!([ms, [b, a, chapter]]).to_string()));
+        let titles = |app: &mut App| {
+            ok(&app.call("children", &json!([ms]).to_string()))
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|c| c["title"].as_str().unwrap().to_string())
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(titles(&mut app), ["B", "A", "Chapter 1"]);
+        assert_eq!(ok(&app.call("undo", "")), "Order by Corkboard");
+        assert_eq!(titles(&mut app), ["Chapter 1", "A", "B"]);
+
+        // Notes live only on the board; one can become a document.
+        let n = ok(&app.call("addBoardNote", &json!([ms, 50, 60, ""]).to_string()));
+        ok(&app.call(
+            "updateBoardNote",
+            &json!([ms, n, "", "Lighthouse goes dark at midnight"]).to_string(),
+        ));
+        ok(&app.call("colorBoardNote", &json!([ms, n, "blue"]).to_string()));
+        ok(&app.call("placeOnBoard", &json!([ms, n, 70, 80]).to_string()));
+        let note = &board(&mut app)["notes"][0];
+        assert_eq!(
+            (note["color"].as_str(), note["x"].as_f64()),
+            (Some("blue"), Some(70.0))
+        );
+        let before = titles(&mut app).len();
+        let doc = ok(&app.call("boardNoteToItem", &json!([ms, n]).to_string()));
+        assert_eq!(titles(&mut app).len(), before + 1);
+        let info = ok(&app.call("nodeInfo", &json!([doc]).to_string()));
+        assert_eq!(info["title"], "Lighthouse goes dark at midnight");
+        assert_eq!(info["synopsis"], "Lighthouse goes dark at midnight");
+        assert_eq!(
+            board(&mut app)["positions"][doc.as_str().unwrap()],
+            json!([70.0, 80.0])
+        );
+        assert!(board(&mut app)["notes"].as_array().unwrap().is_empty());
+        assert_eq!(ok(&app.call("undo", "")), "Make Note a Document");
+        assert_eq!(board(&mut app)["notes"][0]["id"], n);
+
+        // Undo keeps the board freeform (a view choice).
+        ok(&app.call("setBoardFreeform", &json!([ms, false]).to_string()));
+        ok(&app.call("undo", ""));
+        assert_eq!(board(&mut app)["freeform"], false);
+
+        ok(&app.call("tidyBoard", &json!([ms]).to_string()));
+        assert!(board(&mut app)["positions"].as_object().unwrap().is_empty());
+        ok(&app.call("setBoardColor", r##"["#3B5A40"]"##));
+        assert_eq!(board(&mut app)["color"], "#3b5a40");
+        assert!(app
+            .call("setBoardColor", r#"["green"]"#)
+            .json
+            .contains("not a colour"));
+        assert_eq!(ok(&app.call("undo", "")), "Corkboard Colour");
+        assert_eq!(board(&mut app)["color"], Value::Null);
     }
 
     #[test]
