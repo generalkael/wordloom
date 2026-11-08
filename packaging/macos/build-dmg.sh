@@ -30,6 +30,15 @@ if [ -z "$macdeployqt" ] && [ -n "${QT_ROOT_DIR:-}" ]; then
 fi
 [ -x "$macdeployqt" ] || { echo "macdeployqt not found: put Qt's bin on PATH or set QT_ROOT_DIR." >&2; exit 1; }
 
+# The oldest macOS Qt 6.10 supports; without this the build targets the
+# runner's own macOS and the app won't open on anything older.
+export MACOSX_DEPLOYMENT_TARGET="${MACOSX_DEPLOYMENT_TARGET:-13.0}"
+# Qt 6.10's qyieldcpu.h calls __yield() without including <arm_acle.h>,
+# which newer Apple clang rejects.
+if [ "$arch" = arm64 ]; then
+    export CXXFLAGS="${CXXFLAGS:-} -include arm_acle.h"
+fi
+
 cargo build --release -p wordloom
 
 rm -rf "$work"

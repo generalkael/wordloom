@@ -192,7 +192,7 @@ and shows in *Settings ▸ Apps* for uninstalling. A newer MSI replaces an older
 and the Visual C++ runtime. The MSI isn't code-signed, so SmartScreen warns the first time it runs:
 choose *More info ▸ Run anyway*.
 
-**macOS:** `Wordloom-<version>-arm64.dmg`, for Apple Silicon. Open it and drag Wordloom onto
+**macOS:** `Wordloom-<version>-arm64.dmg`, for Apple Silicon (macOS 13 or later). Open it and drag Wordloom onto
 *Applications*. Without a Developer ID the app is signed ad hoc, so the first time, right-click it
 and choose *Open* (or allow it in *System Settings ▸ Privacy & Security*).
 
