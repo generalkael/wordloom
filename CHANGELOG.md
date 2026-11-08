@@ -20,6 +20,12 @@ Notable changes to Wordloom. Each entry lands in the same commit as the change i
   project's; *Use This Colour on All Boards* sets it everywhere.
 - **Editor font & spacing.** *Aa* on the editor bar (View ▸ Editor Font & Spacing…) chooses the
   writing font from the installed fonts, its size and the line spacing, with a live sample.
+- **First-line indent and blank lines.** Editor Font & Spacing can indent body paragraphs (1–3 em),
+  book style: not the first paragraph after a heading or scene break, nor quotes, lists or a
+  paragraph's continuation lines. *Blank lines* shows the gaps between paragraphs at full, half or
+  narrow height. Both change only how the editor looks, not the file. Changing a layout setting or
+  zooming no longer clears the editor's undo history. When typing changes a line's layout (making
+  it a heading drops its indent), that fix is an undo step of its own.
 - **Editor zoom.** 50–300% from the % button, Ctrl+= / Ctrl+− / Ctrl+0 or Ctrl+scroll, separate from
   the font size; a fixed page width zooms too.
 - **Paragraph styles.** A style box on the format bar (and Edit ▸ Paragraph Style, Ctrl+Alt+0–3 and

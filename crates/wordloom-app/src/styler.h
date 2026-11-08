@@ -12,6 +12,8 @@
 #include <QPointer>
 #include <QQuickTextDocument>
 #include <QSyntaxHighlighter>
+#include <QTextBlock>
+#include <QTextCursor>
 #include <vector>
 
 class MarkdownHighlighter : public QSyntaxHighlighter
@@ -56,6 +58,13 @@ class MarkdownStyler : public QObject
     // Line spacing as a multiple of the font's line height (1.0 = single).
     // Applied to every paragraph as a block format; new paragraphs inherit it.
     Q_PROPERTY(qreal lineHeight READ lineHeight WRITE setLineHeight NOTIFY lineHeightChanged)
+    // Indent of the first line of body paragraphs, in ems (0 = none).
+    // Headings, quotes, lists, scene breaks and the paragraph after a
+    // heading or scene break aren't indented.
+    Q_PROPERTY(qreal firstLineIndent READ firstLineIndent WRITE setFirstLineIndent NOTIFY firstLineIndentChanged)
+    // Height of blank lines (the gaps between Markdown paragraphs) as a
+    // fraction of a full line.
+    Q_PROPERTY(qreal blankLineHeight READ blankLineHeight WRITE setBlankLineHeight NOTIFY blankLineHeightChanged)
 
 public:
     explicit MarkdownStyler(QObject *parent = nullptr);
@@ -80,6 +89,10 @@ public:
     void setBaseSize(int px);
     qreal lineHeight() const { return m_lineHeight; }
     void setLineHeight(qreal h);
+    qreal firstLineIndent() const { return m_indent; }
+    void setFirstLineIndent(qreal em);
+    qreal blankLineHeight() const { return m_blankHeight; }
+    void setBlankLineHeight(qreal f);
     // Give every paragraph the line spacing. Call after replacing the text;
     // it keeps the (fresh) undo history empty.
     Q_INVOKABLE void applyLayout();
@@ -87,6 +100,8 @@ public:
     Q_INVOKABLE qreal lineHeightAt(int position) const;
     // The pixel size of the text at a position, 0 if unstyled (self-test).
     Q_INVOKABLE int pixelSizeAt(int position) const;
+    // The first-line indent of the paragraph at a position, in pixels.
+    Q_INVOKABLE qreal indentAt(int position) const;
     // The highlighter's background colour at a document position (for the
     // self-test); transparent where there is none.
     Q_INVOKABLE QColor backgroundAt(int position) const;
@@ -104,10 +119,14 @@ Q_SIGNALS:
     void repeatColorChanged();
     void baseSizeChanged();
     void lineHeightChanged();
+    void firstLineIndentChanged();
+    void blankLineHeightChanged();
 
 private:
     void attach();
     void layoutBlocks();
+    void fixBlocks(int from, int to);
+    bool restyle(QTextBlock first, const QTextBlock &end);
     void watchDocument();
 
     QPointer<QQuickTextDocument> m_document;
@@ -121,6 +140,11 @@ private:
     QColor m_repeatColor{ 80, 140, 230, 60 };
     int m_baseSize = 15;
     qreal m_lineHeight = 1.0;
+    qreal m_indent = 0;
+    qreal m_blankHeight = 1.0;
+    bool m_fixing = false;
+    bool m_stale = false;
+    int m_dirtyFrom = 0, m_dirtyTo = 0;
     QMetaObject::Connection m_contentsConnection;
     bool m_layoutQueued = false;
 };

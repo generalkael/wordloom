@@ -37,6 +37,10 @@ QtObject {
     property int pageWidth: 0
     // Line spacing, as a multiple of single spacing (editor and preview).
     property real lineHeight: 1.45
+    // First-line indent of body paragraphs in ems (0 = none), and the height
+    // of the blank lines between paragraphs as a fraction of a line.
+    property real firstLineIndent: 0
+    property real blankLineHeight: 1.0
     // Editor zoom (Ctrl+= / Ctrl+− / Ctrl+0, Ctrl+wheel): scales the text
     // and a fixed page width without changing the font size itself.
     property real editorZoom: 1.0
@@ -76,6 +80,8 @@ QtObject {
         property alias editorSize: theme.editorSize
         property alias pageWidth: theme.pageWidth
         property alias lineHeight: theme.lineHeight
+        property alias firstLineIndent: theme.firstLineIndent
+        property alias blankLineHeight: theme.blankLineHeight
         property alias editorZoom: theme.editorZoom
         property alias cardWidth: theme.cardWidth
         property alias styledMarkdown: theme.styledMarkdown

@@ -944,7 +944,7 @@ Rectangle {
             loading = true;
             saved = Api.get("text", "", docId);
             area.text = saved;
-            styler.applyLayout();   // line spacing (replacing the text resets it)
+            styler.applyLayout();   // spacing and indents (replacing the text resets them)
             loading = false;
         }
         function flush() {
@@ -989,6 +989,7 @@ Rectangle {
             function tintAt(pos) { return styler.backgroundAt(pos); }
             function lineHeightAt(pos) { return styler.lineHeightAt(pos); }
             function pixelSizeAt(pos) { return styler.pixelSizeAt(pos); }
+            function indentAt(pos) { return styler.indentAt(pos); }
             visible: !ev.preview && !(de.composite && de.isFolder && text.length === 0 && !activeFocus)
             Layout.fillWidth: true
             wrapMode: TextEdit.Wrap
@@ -1059,6 +1060,8 @@ Rectangle {
                 enabled: Theme.styledMarkdown
                 baseSize: Theme.editorPixelSize
                 lineHeight: Theme.lineHeight
+                firstLineIndent: Theme.firstLineIndent
+                blankLineHeight: Theme.blankLineHeight
                 spellCheck: Theme.spellCheck
                 repeats: Theme.highlightRepeats
                 repeatColor: Theme.dark ? Qt.rgba(0.35, 0.6, 1, 0.26) : Qt.rgba(0.3, 0.55, 0.95, 0.22)

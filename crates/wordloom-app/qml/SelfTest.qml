@@ -169,6 +169,50 @@ Item {
             check(ws().textSettingsRef().opened, "the font and spacing dialog opens");
             ws().textSettingsRef().close();
         }],
+        ["indent and blank lines", () => {
+            const a = ed().firstArea();
+            Theme.firstLineIndent = 1.5; Theme.blankLineHeight = 1;
+            a.text = "# Title\nFirst para.\n\nSecond para.\ncontinued\n\n> A quote\n\nThird.";
+        }],
+        ["indent and blank lines", () => {
+            const a = ed().firstArea(), em = Math.round(1.5 * Theme.editorPixelSize), at = (w) => a.indentAt(a.text.indexOf(w));
+            check(at("First") === 0 && at("Second") === em && at("continued") === 0 && at("quote") === 0 && at("Title") === 0,
+                  "body paragraphs are indented, except after a heading, continuation lines and quotes ("
+                  + [at("First"), at("Second"), at("continued"), at("quote")] + " for " + em + ")");
+            check(!a.canUndo, "the indent leaves nothing to undo");
+            a.insert(a.text.indexOf("Second"), "# ");
+        }],
+        ["indent and blank lines", () => {
+            const a = ed().firstArea(), at = (w) => a.indentAt(a.text.indexOf(w));
+            check(at("Second") === 0, "a line made a heading loses its indent (" + at("Second") + ")");
+            a.forceActiveFocus();
+            input.key(win, Qt.Key_Z, Qt.ControlModifier);
+        }],
+        ["indent and blank lines", () => {
+            const a = ed().firstArea(), em = Math.round(1.5 * Theme.editorPixelSize), at = (w) => a.indentAt(a.text.indexOf(w));
+            check(a.text.indexOf("# Second") >= 0 && at("Second") === em, "the first Ctrl+Z undoes just the layout fix (" + at("Second") + ", " + JSON.stringify(a.text) + ")");
+            input.key(win, Qt.Key_Z, Qt.ControlModifier);
+            check(a.text.indexOf("# Second") < 0 && at("Second") === em, "the second undoes the typing (" + at("Second") + ", " + JSON.stringify(a.text) + ")");
+            input.key(win, Qt.Key_Z, Qt.ControlModifier | Qt.ShiftModifier);
+            input.key(win, Qt.Key_Z, Qt.ControlModifier | Qt.ShiftModifier);
+            check(a.text.indexOf("# Second") >= 0 && at("Second") === 0, "and Ctrl+Shift+Z twice redoes both (" + at("Second") + ")");
+            input.key(win, Qt.Key_Z, Qt.ControlModifier);
+            input.key(win, Qt.Key_Z, Qt.ControlModifier);
+            a.insert(a.length, "\n\nFourth.");
+        }],
+        ["indent and blank lines", () => {
+            const a = ed().firstArea(), em = Math.round(1.5 * Theme.editorPixelSize), at = (w) => a.indentAt(a.text.indexOf(w));
+            check(at("Fourth") === em && at("Third") === 0, "a new paragraph is indented (" + at("Fourth") + ", after a quote " + at("Third") + ")");
+            Theme.blankLineHeight = 0.3;
+        }],
+        ["indent and blank lines", () => {
+            const a = ed().firstArea(), blank = a.text.indexOf("\n\n") + 1;
+            check(Math.abs(a.lineHeightAt(blank) - 1.45 * 0.3) < 0.02 && Math.abs(a.lineHeightAt(a.text.indexOf("First")) - 1.45) < 0.01,
+                  "blank lines can be shorter (" + a.lineHeightAt(blank) + ")");
+            check(a.canUndo, "changing the layout mid-edit keeps the undo history");
+            Theme.firstLineIndent = 0; Theme.blankLineHeight = 1;
+            a.text = "";
+        }],
         ["paragraph style", () => {
             const a = ed().firstArea();
             a.text = "Line one\nLine two";

@@ -313,22 +313,38 @@ void MarkdownStyler::setDocument(QQuickTextDocument *document)
 
 // Replacing the text (TextEdit.text = …) resets every paragraph's format and
 // empties the undo history. Shortly after any change with an empty history,
-// the spacing is put back; once there is history, typing has inherited it.
+// the whole layout is put back. After an edit, the paragraphs it touched
+// are fixed up as an undo step of their own (typing "# " un-indents the
+// line; the first Ctrl+Z brings the indent back, the second removes the
+// "# "). After an undo the formats
+// are usually right again, and changing them would lose the redo history,
+// so the whole text is checked with the next edit instead.
 void MarkdownStyler::watchDocument()
 {
     QObject::disconnect(m_contentsConnection);
     QTextDocument *doc = m_document ? m_document->textDocument() : nullptr;
     if (!doc)
         return;
-    m_contentsConnection = connect(doc, &QTextDocument::contentsChange, this, [this]() {
+    m_contentsConnection = connect(doc, &QTextDocument::contentsChange, this, [this](int pos, int, int added) {
+        if (m_fixing)
+            return;
+        m_dirtyFrom = m_layoutQueued ? std::min(m_dirtyFrom, pos) : pos;
+        m_dirtyTo = m_layoutQueued ? std::max(m_dirtyTo, pos + added) : pos + added;
         if (m_layoutQueued)
             return;
         m_layoutQueued = true;
         QTimer::singleShot(0, this, [this]() {
             m_layoutQueued = false;
             QTextDocument *d = m_document ? m_document->textDocument() : nullptr;
-            if (d && d->availableUndoSteps() == 0)
+            if (!d)
+                return;
+            const bool fresh = d->availableUndoSteps() == 0 && !d->isRedoAvailable();
+            if (fresh || (m_stale && !d->isRedoAvailable()))
                 layoutBlocks();
+            else if (d->isRedoAvailable())
+                m_stale = true;   // undone: fix everything with the next edit
+            else
+                fixBlocks(m_dirtyFrom, m_dirtyTo);
         });
     });
 }
@@ -402,6 +418,8 @@ void MarkdownStyler::setBaseSize(int px)
         return;
     m_baseSize = px;
     attach();
+    if (m_indent > 0)
+        layoutBlocks();   // the indent is in ems
     Q_EMIT baseSizeChanged();
 }
 
@@ -415,43 +433,132 @@ void MarkdownStyler::setLineHeight(qreal h)
     Q_EMIT lineHeightChanged();
 }
 
+void MarkdownStyler::setFirstLineIndent(qreal em)
+{
+    em = std::clamp(em, 0.0, 6.0);
+    if (qFuzzyCompare(m_indent + 1, em + 1))
+        return;
+    m_indent = em;
+    layoutBlocks();
+    Q_EMIT firstLineIndentChanged();
+}
+
+void MarkdownStyler::setBlankLineHeight(qreal f)
+{
+    f = std::clamp(f, 0.1, 1.0);
+    if (qFuzzyCompare(m_blankHeight, f))
+        return;
+    m_blankHeight = f;
+    layoutBlocks();
+    Q_EMIT blankLineHeightChanged();
+}
+
 void MarkdownStyler::applyLayout()
 {
     layoutBlocks();
 }
 
-// Block formats are part of the document, so setting them adds undo steps
-// that would "undo" the spacing, and Qt can't set them outside the undo
-// history. So only paragraphs that lack the spacing change, and the history
-// is cleared after: right after the text was loaded it is empty anyway;
-// when the setting changes mid-edit, undoing past it would bring the old
-// spacing back paragraph by paragraph. New paragraphs inherit the format,
-// so typing never needs this.
-void MarkdownStyler::layoutBlocks()
+namespace {
+enum class Kind { Blank, Body, Other };
+
+// What a line is, for layout: blank, body text, or a heading, quote, list
+// item or scene break (as in compile.rs and highlightBlock).
+Kind kindOf(const QString &text)
+{
+    static const QRegularExpression other(QStringLiteral(
+        "^(#{1,6}\\s|\\s*>|\\s*([*_-]\\s*){3,}$|\\s*([-*+]|\\d+[.)])\\s)"));
+    if (text.trimmed().isEmpty())
+        return Kind::Blank;
+    return other.match(text).hasMatch() ? Kind::Other : Kind::Body;
+}
+
+// Body text is indented unless it continues the line above (Markdown joins
+// lines up to a blank one) or follows a heading or scene break, as in print.
+bool indented(const QTextBlock &b)
+{
+    if (kindOf(b.text()) != Kind::Body)
+        return false;
+    QTextBlock p = b.previous();
+    if (p.isValid() && kindOf(p.text()) != Kind::Blank)
+        return false;
+    while (p.isValid() && kindOf(p.text()) == Kind::Blank)
+        p = p.previous();
+    return p.isValid() && kindOf(p.text()) == Kind::Body;
+}
+} // namespace
+
+// Gives the paragraphs from `first` up to (not including) `end` their line
+// spacing and indent, changing only those that differ, as one undo step.
+// Returns whether any did.
+bool MarkdownStyler::restyle(QTextBlock b, const QTextBlock &end)
 {
     QTextDocument *doc = m_document ? m_document->textDocument() : nullptr;
     if (!doc)
-        return;
-    const int height = int(m_lineHeight * 100 + 0.5);
-    bool changed = false;
+        return false;
+    const int line = int(m_lineHeight * 100 + 0.5);
+    const int blank = std::max(10, int(m_lineHeight * m_blankHeight * 100 + 0.5));
+    const qreal indent = std::round(m_indent * m_baseSize);
     QTextCursor cursor(doc);
-    for (QTextBlock b = doc->begin(); b.isValid(); b = b.next()) {
+    bool changed = false;
+    for (; b.isValid() && b != end; b = b.next()) {
         const QTextBlockFormat f = b.blockFormat();
-        if (f.lineHeightType() == QTextBlockFormat::ProportionalHeight && int(f.lineHeight() + 0.5) == height)
+        const int height = kindOf(b.text()) == Kind::Blank ? blank : line;
+        const qreal ind = indented(b) ? indent : 0;
+        if (f.lineHeightType() == QTextBlockFormat::ProportionalHeight && int(f.lineHeight() + 0.5) == height
+            && qFuzzyCompare(f.textIndent() + 1, ind + 1))
             continue;
         if (!changed) {
+            m_fixing = true;
             cursor.beginEditBlock();
             changed = true;
         }
         QTextBlockFormat nf = f;
         nf.setLineHeight(height, QTextBlockFormat::ProportionalHeight);
+        nf.setTextIndent(ind);
         cursor.setPosition(b.position());
         cursor.setBlockFormat(nf);
     }
-    if (!changed)
+    if (changed) {
+        cursor.endEditBlock();
+        m_fixing = false;
+    }
+    return changed;
+}
+
+// Block formats are part of the document, so setting them adds undo steps,
+// and Qt can't set them outside the undo history. Right after the text was
+// loaded the history is empty, so it is cleared again after. Otherwise (a
+// setting or the zoom changed mid-edit, or an edit needs a fix-up) the
+// change is an undo step of its own, after the edit that caused it.
+void MarkdownStyler::layoutBlocks()
+{
+    QTextDocument *doc = m_document ? m_document->textDocument() : nullptr;
+    if (!doc)
         return;
-    cursor.endEditBlock();
-    doc->clearUndoRedoStacks();
+    const bool fresh = doc->availableUndoSteps() == 0 && !doc->isRedoAvailable();
+    if (restyle(doc->begin(), QTextBlock()) && fresh)
+        doc->clearUndoRedoStacks();
+    m_stale = false;
+}
+
+// After an edit between `from` and `to`: those paragraphs, and the ones just
+// around them (whose indent depends on their neighbours).
+void MarkdownStyler::fixBlocks(int from, int to)
+{
+    QTextDocument *doc = m_document ? m_document->textDocument() : nullptr;
+    if (!doc)
+        return;
+    const int last = std::max(0, doc->characterCount() - 1);
+    QTextBlock first = doc->findBlock(std::clamp(from, 0, last));
+    if (first.previous().isValid())
+        first = first.previous();
+    QTextBlock end = doc->findBlock(std::clamp(to, 0, last)).next();
+    // A blank line's edit can change the indent of the next text paragraph.
+    while (end.isValid() && kindOf(end.text()) == Kind::Blank)
+        end = end.next();
+    if (end.isValid())
+        end = end.next();
+    restyle(first, end);
 }
 
 qreal MarkdownStyler::lineHeightAt(int position) const
@@ -461,6 +568,12 @@ qreal MarkdownStyler::lineHeightAt(int position) const
         return 0;
     const QTextBlockFormat f = doc->findBlock(position).blockFormat();
     return f.lineHeightType() == QTextBlockFormat::ProportionalHeight ? f.lineHeight() / 100.0 : 1.0;
+}
+
+qreal MarkdownStyler::indentAt(int position) const
+{
+    QTextDocument *doc = m_document ? m_document->textDocument() : nullptr;
+    return doc ? doc->findBlock(position).blockFormat().textIndent() : 0;
 }
 
 int MarkdownStyler::pixelSizeAt(int position) const
