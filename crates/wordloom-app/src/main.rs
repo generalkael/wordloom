@@ -6,6 +6,14 @@ mod styling;
 use cxx_qt_lib::{QGuiApplication, QQmlApplicationEngine, QQuickStyle, QString, QUrl};
 
 fn main() {
+    // Preferences ▸ General ▸ Interface size scales the whole UI; Qt reads
+    // it once, at startup. A QT_SCALE_FACTOR set by the user wins.
+    if std::env::var_os("QT_SCALE_FACTOR").is_none() {
+        let scale = wordloom_core::uiscale::load(&controller::config_dir());
+        if (scale - 1.0).abs() > 1e-9 {
+            std::env::set_var("QT_SCALE_FACTOR", scale.to_string());
+        }
+    }
     let mut app = QGuiApplication::new();
     if let Some(mut app) = app.as_mut() {
         app.as_mut()

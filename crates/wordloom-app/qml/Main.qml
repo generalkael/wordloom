@@ -149,7 +149,7 @@ ApplicationWindow {
         property string dir: ""
         property bool dark: false
         property int step: 0
-        readonly property var views: ["editor", "multiselect", "favorites", "corkboard", "carddrag", "freeform", "outliner", "styled", "fonts", "complete", "linebar", "repeats", "footnote", "timeline", "lanes", "event", "search", "goto", "compile", "pdf", "stats", "settings", "add", "undo", "split", "file", "compare", "relations", "relation", "names", "history", "sprint", "analysis", "grid", "autobackup", "preferences", "prefseditor", "prefswriting", "prefscorkboard", "newproject", "reader", "focus", "start"]
+        readonly property var views: ["editor", "multiselect", "favorites", "corkboard", "carddrag", "freeform", "outliner", "styled", "fonts", "complete", "linebar", "repeats", "footnote", "timeline", "lanes", "event", "search", "goto", "compile", "pdf", "stats", "settings", "add", "undo", "split", "file", "compare", "relations", "relation", "names", "history", "sprint", "analysis", "grid", "autobackup", "preferences", "prefseditor", "prefswriting", "prefscorkboard", "prefsshortcuts", "newproject", "reader", "focus", "start"]
         interval: 700
         repeat: true
         // Even ticks switch view, odd ticks capture it.
@@ -160,7 +160,7 @@ ApplicationWindow {
                 loader.grabToImage(r => r.saveToFile(file));
                 // Popups render in the window overlay, which can't be grabbed;
                 // capture the dialog's own content instead.
-                const dlg = { event: win.ws ? win.ws.eventDialog() : null, compile: compileDialog, pdf: compileDialog, goto: goTo, stats: statsDialog, settings: settingsDialog, compare: win.ws ? win.ws.compareDialogRef() : null, fonts: prefsDialog, relation: win.ws ? win.ws.relationDialogRef() : null, names: nameDialog, sprint: sprintDialog, analysis: analysisDialog, grid: presenceDialog, autobackup: prefsDialog, preferences: prefsDialog, prefseditor: prefsDialog, prefswriting: prefsDialog, prefscorkboard: prefsDialog, newproject: newDialog }[v];
+                const dlg = { event: win.ws ? win.ws.eventDialog() : null, compile: compileDialog, pdf: compileDialog, goto: goTo, stats: statsDialog, settings: settingsDialog, compare: win.ws ? win.ws.compareDialogRef() : null, fonts: prefsDialog, relation: win.ws ? win.ws.relationDialogRef() : null, names: nameDialog, sprint: sprintDialog, analysis: analysisDialog, grid: presenceDialog, autobackup: prefsDialog, preferences: prefsDialog, prefseditor: prefsDialog, prefswriting: prefsDialog, prefscorkboard: prefsDialog, prefsshortcuts: prefsDialog, newproject: newDialog }[v];
                 if (dlg && dlg.contentChildren.length) dlg.contentChildren[0].grabToImage(r => r.saveToFile(file.replace(".png", "-dialog.png")));
                 if (v === "history") historyWindow.contentItem.grabToImage(r => r.saveToFile(file.replace(".png", "-window.png")));
             } else if (v === undefined) {
@@ -246,7 +246,7 @@ ApplicationWindow {
                         Api.call("updateBoardNote", ms, n, "Idea", "What if the keeper's log was never his? Check the handwriting.");
                         Api.call("colorBoardNote", ms, n, "yellow");
                         const n2 = Api.call("addBoardNote", ms, 300, 520, "Research: Fresnel lens rotation speed");
-                        if (n2) { Api.call("colorBoardNote", ms, n2, "blue"); Api.call("updateBoardNote", ms, n2, "Research", "Fresnel lens rotation speed, and how long a lamp burns on one filling"); }
+                        if (n2) { Api.call("colorBoardNote", ms, n2, "blue"); Api.call("updateBoardNote", ms, n2, "Research", "Fresnel lens rotation speed, and how long a lamp burns on one filling"); Api.call("resizeBoardNote", ms, n2, 320, 110); }
                         if (kids.length > 1) Api.call("placeOnBoard", ms, kids[kids.length - 1].id, 40, 330);
                     }
                 }
@@ -315,8 +315,8 @@ ApplicationWindow {
             title: qsTr("&File")
             // Ctrl+N means New Document once a project is open; two actions on one
             // key would make Qt treat it as ambiguous and fire neither.
-            Action { text: qsTr("&New Project…"); shortcut: win.ws === null ? StandardKey.New : ""; onTriggered: win.newProject() }
-            Action { text: qsTr("&Open Project…"); shortcut: StandardKey.Open; onTriggered: win.openProject() }
+            Action { text: qsTr("&New Project…"); shortcut: win.ws === null ? Shortcuts.seq("file.newProject") : ""; onTriggered: win.newProject() }
+            Action { text: qsTr("&Open Project…"); shortcut: Shortcuts.seq("file.open"); onTriggered: win.openProject() }
             Menu {
                 id: recentMenu
                 title: qsTr("Open &Recent")
@@ -334,117 +334,118 @@ ApplicationWindow {
                 }
             }
             MenuSeparator {}
-            Action { text: qsTr("&Save"); shortcut: StandardKey.Save; enabled: Wordloom.projectOpen; onTriggered: win.saveNow() }
-            Action { text: qsTr("Save &As…"); enabled: Wordloom.projectOpen; onTriggered: saveAsDialog.open() }
-            Action { text: qsTr("&Back Up to Zip…"); enabled: Wordloom.projectOpen; onTriggered: backupDialog.start() }
-            Action { text: qsTr("Restore from &Zip Backup…"); onTriggered: restoreZipDialog.start() }
-            Action { text: qsTr("Import &Manuscript…"); enabled: win.ws !== null; onTriggered: manuscriptDialog.open() }
-            Action { text: qsTr("&Import File…"); shortcut: "Ctrl+Shift+I"; enabled: win.ws !== null; onTriggered: importDialog.open() }
-            Action { text: qsTr("Clean Up &Unused Files…"); enabled: win.ws !== null; onTriggered: cleanupDialog.check() }
-            Action { text: qsTr("Take &Snapshot"); shortcut: "Ctrl+5"; enabled: win.ws !== null; onTriggered: win.ws.snapshot() }
+            Action { text: qsTr("&Save"); shortcut: Shortcuts.seq("file.save"); enabled: Wordloom.projectOpen; onTriggered: win.saveNow() }
+            Action { text: qsTr("Save &As…"); shortcut: Shortcuts.seq("file.saveAs"); enabled: Wordloom.projectOpen; onTriggered: saveAsDialog.open() }
+            Action { text: qsTr("&Back Up to Zip…"); shortcut: Shortcuts.seq("file.backup"); enabled: Wordloom.projectOpen; onTriggered: backupDialog.start() }
+            Action { text: qsTr("Restore from &Zip Backup…"); shortcut: Shortcuts.seq("file.restore"); onTriggered: restoreZipDialog.start() }
+            Action { text: qsTr("Import &Manuscript…"); shortcut: Shortcuts.seq("file.importManuscript"); enabled: win.ws !== null; onTriggered: manuscriptDialog.open() }
+            Action { text: qsTr("&Import File…"); shortcut: Shortcuts.seq("file.importFile"); enabled: win.ws !== null; onTriggered: importDialog.open() }
+            Action { text: qsTr("Clean Up &Unused Files…"); shortcut: Shortcuts.seq("file.cleanUp"); enabled: win.ws !== null; onTriggered: cleanupDialog.check() }
+            Action { text: qsTr("Take &Snapshot"); shortcut: Shortcuts.seq("file.snapshot"); enabled: win.ws !== null; onTriggered: win.ws.snapshot() }
             MenuSeparator {}
-            Action { text: qsTr("&Compile / Export…"); shortcut: "Ctrl+Shift+E"; enabled: Wordloom.projectOpen; onTriggered: compileDialog.open() }
-            Action { text: qsTr("Export Story &Bible…"); enabled: Wordloom.projectOpen; onTriggered: bibleDialog.start() }
-            Action { text: qsTr("Project Se&ttings…"); enabled: Wordloom.projectOpen; onTriggered: settingsDialog.open() }
+            Action { text: qsTr("&Compile / Export…"); shortcut: Shortcuts.seq("file.compile"); enabled: Wordloom.projectOpen; onTriggered: compileDialog.open() }
+            Action { text: qsTr("Export Story &Bible…"); shortcut: Shortcuts.seq("file.bible"); enabled: Wordloom.projectOpen; onTriggered: bibleDialog.start() }
+            Action { text: qsTr("Project Se&ttings…"); shortcut: Shortcuts.seq("file.projectSettings"); enabled: Wordloom.projectOpen; onTriggered: settingsDialog.open() }
             MenuSeparator {}
-            Action { text: qsTr("&Close Project"); enabled: Wordloom.projectOpen; onTriggered: win.closeProject() }
-            Action { text: qsTr("&Quit"); shortcut: StandardKey.Quit; onTriggered: win.close() }
+            Action { text: qsTr("&Close Project"); shortcut: Shortcuts.seq("file.close"); enabled: Wordloom.projectOpen; onTriggered: win.closeProject() }
+            Action { text: qsTr("&Quit"); shortcut: Shortcuts.seq("file.quit"); onTriggered: win.close() }
         }
         Menu {
             title: qsTr("&Edit")
             // In a text box Ctrl+Z undoes typing; these undo project changes.
             Action {
                 text: Wordloom.undoText ? qsTr("&Undo %1").arg(Wordloom.undoText) : qsTr("&Undo")
-                shortcut: StandardKey.Undo
+                shortcut: Shortcuts.seq("edit.undo")
                 enabled: win.ws !== null && Wordloom.undoText !== ""
                 onTriggered: win.ws.undo()
             }
             Action {
                 text: Wordloom.redoText ? qsTr("&Redo %1").arg(Wordloom.redoText) : qsTr("&Redo")
-                shortcut: StandardKey.Redo
+                shortcut: Shortcuts.seq("edit.redo")
                 enabled: win.ws !== null && Wordloom.redoText !== ""
                 onTriggered: win.ws.redo()
             }
             MenuSeparator {}
-            Action { text: qsTr("&Find in Document…"); shortcut: StandardKey.Find; enabled: win.ws !== null; onTriggered: win.ws.findInDocument(false) }
-            Action { text: qsTr("&Replace in Document…"); shortcut: StandardKey.Replace; enabled: win.ws !== null; onTriggered: win.ws.findInDocument(true) }
+            Action { text: qsTr("&Find in Document…"); shortcut: Shortcuts.seq("edit.find"); enabled: win.ws !== null; onTriggered: win.ws.findInDocument(false) }
+            Action { text: qsTr("&Replace in Document…"); shortcut: Shortcuts.seq("edit.replace"); enabled: win.ws !== null; onTriggered: win.ws.findInDocument(true) }
+            Action { text: qsTr("Find in &Project"); shortcut: Shortcuts.seq("edit.findProject"); enabled: win.ws !== null; onTriggered: win.ws.focusSearch() }
+            Action { text: qsTr("Replace in Pro&ject…"); shortcut: Shortcuts.seq("edit.replaceProject"); enabled: win.ws !== null; onTriggered: win.ws.replaceInProject() }
             MenuSeparator {}
-            Action { text: qsTr("Con&vert to Smart Punctuation"); enabled: win.ws !== null; onTriggered: win.ws.smartenDocument() }
+            Action { text: qsTr("Con&vert to Smart Punctuation"); shortcut: Shortcuts.seq("edit.smarten"); enabled: win.ws !== null; onTriggered: win.ws.smartenDocument() }
             Menu {
                 title: qsTr("Paragraph St&yle")
                 enabled: win.ws !== null
-                Action { text: qsTr("&Body Text"); shortcut: "Ctrl+Alt+0"; onTriggered: win.ws.setParagraphStyle("body") }
-                Action { text: qsTr("Heading &1"); shortcut: "Ctrl+Alt+1"; onTriggered: win.ws.setParagraphStyle("h1") }
-                Action { text: qsTr("Heading &2"); shortcut: "Ctrl+Alt+2"; onTriggered: win.ws.setParagraphStyle("h2") }
-                Action { text: qsTr("Heading &3"); shortcut: "Ctrl+Alt+3"; onTriggered: win.ws.setParagraphStyle("h3") }
-                Action { text: qsTr("Block &Quote"); shortcut: "Ctrl+Alt+Q"; onTriggered: win.ws.setParagraphStyle("quote") }
+                Action { text: qsTr("&Body Text"); shortcut: Shortcuts.seq("edit.body"); onTriggered: win.ws.setParagraphStyle("body") }
+                Action { text: qsTr("Heading &1"); shortcut: Shortcuts.seq("edit.h1"); onTriggered: win.ws.setParagraphStyle("h1") }
+                Action { text: qsTr("Heading &2"); shortcut: Shortcuts.seq("edit.h2"); onTriggered: win.ws.setParagraphStyle("h2") }
+                Action { text: qsTr("Heading &3"); shortcut: Shortcuts.seq("edit.h3"); onTriggered: win.ws.setParagraphStyle("h3") }
+                Action { text: qsTr("Block &Quote"); shortcut: Shortcuts.seq("edit.quote"); onTriggered: win.ws.setParagraphStyle("quote") }
             }
-            Action { text: qsTr("Insert &Comment"); shortcut: "Ctrl+Alt+M"; enabled: win.ws !== null; onTriggered: win.ws.insertComment() }
-            Action { text: qsTr("Insert &Footnote"); shortcut: "Ctrl+Alt+F"; enabled: win.ws !== null; onTriggered: win.ws.insertFootnote() }
+            Action { text: qsTr("Insert &Comment"); shortcut: Shortcuts.seq("edit.comment"); enabled: win.ws !== null; onTriggered: win.ws.insertComment() }
+            Action { text: qsTr("Insert &Footnote"); shortcut: Shortcuts.seq("edit.footnote"); enabled: win.ws !== null; onTriggered: win.ws.insertFootnote() }
             MenuSeparator {}
-            Action { text: qsTr("Pre&ferences…"); shortcut: "Ctrl+,"; onTriggered: prefsDialog.open() }
+            Action { text: qsTr("Pre&ferences…"); shortcut: Shortcuts.seq("edit.preferences"); onTriggered: prefsDialog.open() }
         }
         Menu {
             title: qsTr("&Project")
             enabled: win.ws !== null
-            Action { text: qsTr("New &Document"); shortcut: "Ctrl+N"; onTriggered: win.ws.addItem("text") }
-            Action { text: qsTr("New &Folder"); shortcut: "Ctrl+Shift+N"; onTriggered: win.ws.addItem("folder") }
-            Action { text: qsTr("New &Character"); onTriggered: win.ws.addInSection("characters") }
-            Action { text: qsTr("New &Place"); onTriggered: win.ws.addInSection("places") }
-            Action { text: qsTr("&Name Generator…"); shortcut: "Ctrl+Shift+G"; onTriggered: nameDialog.open() }
+            Action { text: qsTr("New &Document"); shortcut: Shortcuts.seq("project.newDocument"); onTriggered: win.ws.addItem("text") }
+            Action { text: qsTr("New &Folder"); shortcut: Shortcuts.seq("project.newFolder"); onTriggered: win.ws.addItem("folder") }
+            Action { text: qsTr("New &Character"); shortcut: Shortcuts.seq("project.newCharacter"); onTriggered: win.ws.addInSection("characters") }
+            Action { text: qsTr("New &Place"); shortcut: Shortcuts.seq("project.newPlace"); onTriggered: win.ws.addInSection("places") }
+            Action { text: qsTr("&Name Generator…"); shortcut: Shortcuts.seq("project.names"); onTriggered: nameDialog.open() }
             MenuSeparator {}
-            Action { text: qsTr("D&uplicate"); shortcut: "Ctrl+D"; onTriggered: win.ws.duplicate() }
-            Action { text: qsTr("Split at Cursor"); shortcut: "Ctrl+K"; onTriggered: win.ws.splitAtCursor() }
-            Action { text: qsTr("Merge with Next"); shortcut: "Ctrl+Shift+M"; onTriggered: win.ws.mergeNext() }
+            Action { text: qsTr("D&uplicate"); shortcut: Shortcuts.seq("project.duplicate"); onTriggered: win.ws.duplicate() }
+            Action { text: qsTr("Split at Cursor"); shortcut: Shortcuts.seq("project.split"); onTriggered: win.ws.splitAtCursor() }
+            Action { text: qsTr("Merge with Next"); shortcut: Shortcuts.seq("project.merge"); onTriggered: win.ws.mergeNext() }
             Action {
                 text: win.ws && win.ws.focusedNode && win.ws.focusedNode.favorite ? qsTr("Remove from Fa&vourites") : qsTr("Add to Fa&vourites")
-                shortcut: "Ctrl+Shift+D"
+                shortcut: Shortcuts.seq("project.favourite")
                 onTriggered: win.ws.toggleFavorite()
             }
-            Action { text: qsTr("Move to &Trash"); onTriggered: win.ws.trashCurrent() }
-            Action { text: qsTr("&Empty Trash"); onTriggered: win.ws.emptyTrash() }
+            Action { text: qsTr("Move to &Trash"); shortcut: Shortcuts.seq("project.trash"); onTriggered: win.ws.trashCurrent() }
+            Action { text: qsTr("&Empty Trash"); shortcut: Shortcuts.seq("project.emptyTrash"); onTriggered: win.ws.emptyTrash() }
             MenuSeparator {}
-            Action { text: qsTr("&Go to…"); shortcut: "Ctrl+P"; onTriggered: goTo.start() }
-            Action { text: qsTr("&Find in Project"); shortcut: "Ctrl+Shift+F"; onTriggered: win.ws.focusSearch() }
-            Action { text: qsTr("Writing &Statistics…"); shortcut: "Ctrl+Shift+T"; onTriggered: statsDialog.open() }
-            Action { text: qsTr("Word Count &History…"); shortcut: "Ctrl+Shift+H"; onTriggered: historyWindow.show() }
-            Action { text: qsTr("Text &Analysis…"); shortcut: "Ctrl+Shift+A"; onTriggered: analysisDialog.open() }
-            Action { text: qsTr("Character &Grid…"); enabled: win.ws !== null; onTriggered: presenceDialog.open() }
-            Action { text: qsTr("Writing Sp&rint…"); shortcut: "Ctrl+Shift+R"; onTriggered: sprintDialog.open() }
+            Action { text: qsTr("&Go to…"); shortcut: Shortcuts.seq("project.goTo"); onTriggered: goTo.start() }
+            Action { text: qsTr("Writing &Statistics…"); shortcut: Shortcuts.seq("project.stats"); onTriggered: statsDialog.open() }
+            Action { text: qsTr("Word Count &History…"); shortcut: Shortcuts.seq("project.history"); onTriggered: historyWindow.show() }
+            Action { text: qsTr("Text &Analysis…"); shortcut: Shortcuts.seq("project.analysis"); onTriggered: analysisDialog.open() }
+            Action { text: qsTr("Character &Grid…"); shortcut: Shortcuts.seq("project.grid"); enabled: win.ws !== null; onTriggered: presenceDialog.open() }
+            Action { text: qsTr("Writing Sp&rint…"); shortcut: Shortcuts.seq("project.sprint"); onTriggered: sprintDialog.open() }
         }
         Menu {
             title: qsTr("&View")
             enabled: win.ws !== null
-            Action { text: qsTr("&Editor"); shortcut: "Ctrl+1"; onTriggered: win.ws.viewMode = "editor" }
-            Action { text: qsTr("&Corkboard"); shortcut: "Ctrl+2"; onTriggered: win.ws.viewMode = "corkboard" }
-            Action { text: qsTr("&Outliner"); shortcut: "Ctrl+3"; onTriggered: win.ws.viewMode = "outliner" }
-            Action { text: qsTr("&Timeline (Gantt)"); shortcut: "Ctrl+4"; onTriggered: win.ws.viewMode = "timeline" }
-            Action { text: qsTr("&Relationship Map"); shortcut: "Ctrl+6"; onTriggered: win.ws.viewMode = "relations" }
-            Action { text: qsTr("Rea&ding Mode"); shortcut: "Ctrl+7"; onTriggered: win.ws.viewMode = "reader" }
+            Action { text: qsTr("&Editor"); shortcut: Shortcuts.seq("view.editor"); onTriggered: win.ws.viewMode = "editor" }
+            Action { text: qsTr("&Corkboard"); shortcut: Shortcuts.seq("view.corkboard"); onTriggered: win.ws.viewMode = "corkboard" }
+            Action { text: qsTr("&Outliner"); shortcut: Shortcuts.seq("view.outliner"); onTriggered: win.ws.viewMode = "outliner" }
+            Action { text: qsTr("&Timeline (Gantt)"); shortcut: Shortcuts.seq("view.timeline"); onTriggered: win.ws.viewMode = "timeline" }
+            Action { text: qsTr("&Relationship Map"); shortcut: Shortcuts.seq("view.relations"); onTriggered: win.ws.viewMode = "relations" }
+            Action { text: qsTr("Rea&ding Mode"); shortcut: Shortcuts.seq("view.reader"); onTriggered: win.ws.viewMode = "reader" }
             MenuSeparator {}
-            Action { text: qsTr("Go &Back"); shortcut: "Alt+Left"; enabled: win.ws ? win.ws.canGoBack : false; onTriggered: win.ws.goBack() }
-            Action { text: qsTr("Go For&ward"); shortcut: "Alt+Right"; enabled: win.ws ? win.ws.canGoForward : false; onTriggered: win.ws.goForward() }
+            Action { text: qsTr("Go &Back"); shortcut: Shortcuts.seq("view.back"); enabled: win.ws ? win.ws.canGoBack : false; onTriggered: win.ws.goBack() }
+            Action { text: qsTr("Go For&ward"); shortcut: Shortcuts.seq("view.forward"); enabled: win.ws ? win.ws.canGoForward : false; onTriggered: win.ws.goForward() }
             MenuSeparator {}
-            Action { text: qsTr("&Split Editor"); shortcut: "Ctrl+\\"; checkable: true; checked: win.ws ? win.ws.splitId !== "" : false; onTriggered: win.ws.toggleSplit() }
-            Action { text: qsTr("&Focus Mode"); shortcut: "F11"; checkable: true; checked: win.ws ? win.ws.focusMode : false; onTriggered: win.ws.focusMode = !win.ws.focusMode }
-            Action { text: qsTr("Show &Binder"); checkable: true; checked: win.ws ? win.ws.showBinder : true; onTriggered: win.ws.showBinder = !win.ws.showBinder }
-            Action { text: qsTr("Show &Details"); shortcut: "Ctrl+Alt+I"; checkable: true; checked: win.ws ? win.ws.showInspector : true; onTriggered: win.ws.showInspector = !win.ws.showInspector }
+            Action { text: qsTr("&Split Editor"); shortcut: Shortcuts.seq("view.split"); checkable: true; checked: win.ws ? win.ws.splitId !== "" : false; onTriggered: win.ws.toggleSplit() }
+            Action { text: qsTr("&Focus Mode"); shortcut: Shortcuts.seq("view.focus"); checkable: true; checked: win.ws ? win.ws.focusMode : false; onTriggered: win.ws.focusMode = !win.ws.focusMode }
+            Action { text: qsTr("Show &Binder"); shortcut: Shortcuts.seq("view.binder"); checkable: true; checked: win.ws ? win.ws.showBinder : true; onTriggered: win.ws.showBinder = !win.ws.showBinder }
+            Action { text: qsTr("Show &Details"); shortcut: Shortcuts.seq("view.details"); checkable: true; checked: win.ws ? win.ws.showInspector : true; onTriggered: win.ws.showInspector = !win.ws.showInspector }
             MenuSeparator {}
-            Action { text: qsTr("Highlight Re&peated Words"); checkable: true; checked: Theme.highlightRepeats; onTriggered: Theme.highlightRepeats = !Theme.highlightRepeats }
-            Action { text: qsTr("&Highlight Current Line"); checkable: true; checked: Theme.lineHighlight; onTriggered: Theme.lineHighlight = !Theme.lineHighlight }
-            Action { text: qsTr("Check &Spelling"); shortcut: "F7"; checkable: true; checked: Theme.spellCheck; onTriggered: Theme.spellCheck = !Theme.spellCheck }
-            Action { text: qsTr("Styled &Markdown"); checkable: true; checked: Theme.styledMarkdown; onTriggered: Theme.styledMarkdown = !Theme.styledMarkdown }
-            Action { text: qsTr("Editor &Font && Spacing…"); onTriggered: prefsDialog.openAt("font") }
+            Action { text: qsTr("Highlight Re&peated Words"); shortcut: Shortcuts.seq("view.repeats"); checkable: true; checked: Theme.highlightRepeats; onTriggered: Theme.highlightRepeats = !Theme.highlightRepeats }
+            Action { text: qsTr("&Highlight Current Line"); shortcut: Shortcuts.seq("view.lineHighlight"); checkable: true; checked: Theme.lineHighlight; onTriggered: Theme.lineHighlight = !Theme.lineHighlight }
+            Action { text: qsTr("Check &Spelling"); shortcut: Shortcuts.seq("view.spelling"); checkable: true; checked: Theme.spellCheck; onTriggered: Theme.spellCheck = !Theme.spellCheck }
+            Action { text: qsTr("Styled &Markdown"); shortcut: Shortcuts.seq("view.styled"); checkable: true; checked: Theme.styledMarkdown; onTriggered: Theme.styledMarkdown = !Theme.styledMarkdown }
+            Action { text: qsTr("Editor &Font && Spacing…"); shortcut: Shortcuts.seq("view.fonts"); onTriggered: prefsDialog.openAt("font") }
             Menu {
                 title: qsTr("&Zoom (%1)").arg(Theme.zoomText)
-                Action { text: qsTr("Zoom &In"); shortcut: StandardKey.ZoomIn; onTriggered: Theme.zoomIn() }
-                Action { text: qsTr("Zoom &Out"); shortcut: StandardKey.ZoomOut; onTriggered: Theme.zoomOut() }
-                Action { text: qsTr("&Actual Size"); shortcut: "Ctrl+0"; onTriggered: Theme.resetZoom() }
+                Action { text: qsTr("Zoom &In"); shortcut: Shortcuts.seq("view.zoomIn"); onTriggered: Theme.zoomIn() }
+                Action { text: qsTr("Zoom &Out"); shortcut: Shortcuts.seq("view.zoomOut"); onTriggered: Theme.zoomOut() }
+                Action { text: qsTr("&Actual Size"); shortcut: Shortcuts.seq("view.actualSize"); onTriggered: Theme.resetZoom() }
             }
         }
         Menu {
             title: qsTr("&Help")
-            Action { text: qsTr("&About Wordloom"); onTriggered: aboutDialog.open() }
+            Action { text: qsTr("&About Wordloom"); shortcut: Shortcuts.seq("help.about"); onTriggered: aboutDialog.open() }
         }
     }
 

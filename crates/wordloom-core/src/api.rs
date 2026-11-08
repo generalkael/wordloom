@@ -125,6 +125,8 @@ const READ_ONLY: &[&str] = &[
     "spellRemove",
     "spellInfo",
     "spellLanguages",
+    "uiScale",
+    "setUiScale",
     "spellSetLanguage",
     "nameStyles",
     "generateNames",
@@ -214,6 +216,7 @@ fn undo_label(method: &str, a: &Args) -> Option<(String, Option<String>)> {
         "orderChildren" => "Order by Corkboard",
         "addBoardNote" => "Add Note",
         "colorBoardNote" => "Note Colour",
+        "resizeBoardNote" => "Resize Note",
         "removeBoardNote" => "Delete Note",
         "boardNoteToItem" => "Make Note a Document",
         "move" | "dropOn" | "shift" => "Move",
@@ -310,6 +313,14 @@ impl App {
         }
     }
 
+    /// Where per-user files live (recent projects, dictionary, interface size).
+    fn config_dir(&self) -> PathBuf {
+        self.recent_file
+            .parent()
+            .map(PathBuf::from)
+            .unwrap_or_default()
+    }
+
     fn s(&mut self) -> Result<&mut Session> {
         self.session
             .as_mut()
@@ -327,6 +338,13 @@ impl App {
         Ok(match m {
             // --- lifecycle ---
             "recent" => json!(recent::load(&self.recent_file)),
+            // Preferences ▸ General ▸ Interface size: the saved scale (read
+            // by the app before Qt starts) and the one in use now.
+            "uiScale" => json!({
+                "saved": crate::uiscale::load(&self.config_dir()),
+                "running": crate::uiscale::running(),
+            }),
+            "setUiScale" => json!(crate::uiscale::save(&self.config_dir(), a.float(0))?),
             // Keep this project's lock fresh while it's open (UI timer).
             "touchLock" => {
                 if let Some(s) = &self.session {
@@ -491,8 +509,22 @@ impl App {
             "upsertStatus" => json!(self.s()?.upsert_status(a.str(0), a.str(1))?),
             "removeStatus" => unit(self.s()?.remove_status(a.str(0)))?,
             // --- search/stats/compile ---
-            "search" => self.s()?.search(a.str(0)),
-            "replaceAll" => self.s()?.replace_all(a.str(0), a.str(1)),
+            // [query, matchCase, wholeWords]
+            "search" => {
+                let o = crate::search::Options {
+                    case: a.bool(1),
+                    word: a.bool(2),
+                };
+                self.s()?.search(a.str(0), o)
+            }
+            // [find, replace, matchCase, wholeWords, [document ids] (all if empty)]
+            "replaceAll" => {
+                let o = crate::search::Options {
+                    case: a.bool(2),
+                    word: a.bool(3),
+                };
+                self.s()?.replace_all(a.str(0), a.str(1), o, &a.strs(4))?
+            }
             "stats" => self.s()?.stats(None),
             "sprints" => self.s()?.sprints(),
             "recordSprint" => unit(self.s()?.record_sprint(a.float(0), a.int(1), a.int(2)))?,
@@ -618,6 +650,12 @@ impl App {
                 )?
             }
             "colorBoardNote" => unit(self.s()?.color_board_note(a.str(0), a.str(1), a.str(2)))?,
+            "resizeBoardNote" => {
+                unit(
+                    self.s()?
+                        .resize_board_note(a.str(0), a.str(1), a.float(2), a.float(3)),
+                )?
+            }
             "removeBoardNote" => unit(self.s()?.remove_board_note(a.str(0), a.str(1)))?,
             "boardNoteToItem" => json!(self.s()?.board_note_to_item(a.str(0), a.str(1))?),
             "compareSnapshots" => self.s()?.compare_snapshots(a.str(0), a.str(1), a.str(2))?,
@@ -793,6 +831,22 @@ mod tests {
             (note["color"].as_str(), note["x"].as_f64()),
             (Some("blue"), Some(70.0))
         );
+        // Resizing keeps within limits, undoes, and zero goes back to the card size.
+        ok(&app.call("resizeBoardNote", &json!([ms, n, 400, 20]).to_string()));
+        let note = &board(&mut app)["notes"][0];
+        assert_eq!(
+            (note["w"].as_f64(), note["h"].as_f64()),
+            (Some(400.0), Some(70.0))
+        );
+        assert_eq!(ok(&app.call("undo", "")), "Resize Note");
+        assert!(board(&mut app)["notes"][0].get("w").is_none());
+        ok(&app.call("resizeBoardNote", &json!([ms, n, 300, 200]).to_string()));
+        ok(&app.call("resizeBoardNote", &json!([ms, n, 0, 0]).to_string()));
+        assert!(board(&mut app)["notes"][0].get("w").is_none());
+        assert!(app
+            .call("resizeBoardNote", &json!([ms, n, "NaN", 5]).to_string())
+            .error
+            .is_some());
         let before = titles(&mut app).len();
         let doc = ok(&app.call("boardNoteToItem", &json!([ms, n]).to_string()));
         assert_eq!(titles(&mut app).len(), before + 1);

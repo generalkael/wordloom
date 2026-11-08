@@ -12,6 +12,8 @@ Item {
     property var sprint                  // SprintDialog
     property var analysis                // AnalysisDialog
     property var compile                 // CompileDialog
+    property string noteId: ""          // the note resized (note resize)
+    property var replaceBefore: []        // texts before a project replace
     property var groupStart: null        // spots before a group drag (freeform groups)
     property var goTo                    // GoToPopup
     property var autoBackup              // Main.qml's automatic backups
@@ -185,6 +187,11 @@ Item {
             check(win.autosaveMs() === 60000, "the autosave period follows the preference (" + win.autosaveMs() + ")");
             Theme.autosaveSeconds = 15;
             check(Theme.projectsFolder === "" && Theme.newProjectsFolder.endsWith("/Wordloom"), "new projects go in Documents/Wordloom by default (" + Theme.newProjectsFolder + ")");
+            check(prefs.setScale(1.25) === 1.25 && prefs.scaleInfo.saved === 1.25 && Api.call("uiScale").saved === 1.25, "the interface size is saved for the next start");
+            check(Api.call("uiScale").running === 1, "and doesn't change this run");
+            check(prefs.setScale(7) === undefined && Api.call("uiScale").saved === 1.25, "a size out of range is refused");
+            prefs.setScale(1);
+            check(Api.call("uiScale").saved === 1, "100% goes back to normal");
             prefs.openAt("nonsense");
             check(prefs.page === "writing", "an unknown page leaves the page as it was");
             prefs.close();
@@ -789,6 +796,106 @@ Item {
             check(grid.grid.rows.length === 1 && grid.grid.rows[0].title === "Skerry Light", "and it does places too");
             grid.kind = "character";
             grid.close();
+        }],
+        ["note resize", () => {
+            const ms = Api.call("rootId", "manuscript");
+            ws().select(ms, "corkboard");
+            ws().corkboardRef().setFreeform(true);
+            Theme.boardSnap = false;
+            st.noteId = Api.call("addBoardNote", ms, 300, 380, "Resize me");
+        }],
+        ["note resize", () => {
+            const c = ws().corkboardRef(), g = c.noteGrip(st.noteId);
+            check(g !== null, "a freeform note has a resize grip");
+            if (g) input.drag(win, g, Qt.point(g.x + 100, g.y + 60));
+        }],
+        ["note resize", () => {
+            const c = ws().corkboardRef(), ms = Api.call("rootId", "manuscript");
+            const n = Api.get("board", null, ms).notes.find(x => x.id === st.noteId) || {};
+            const ew = 230 + 100 / c.unit, eh = 230 * 0.66 + 60 / c.unit;
+            check(Math.abs(n.w - ew) <= 2 && Math.abs(n.h - eh) <= 2, "dragging the grip resizes the note (" + n.w + "×" + n.h + ", expected about " + Math.round(ew) + "×" + Math.round(eh) + ")");
+            check(n.x === 300 && n.y === 380, "without moving it (" + n.x + ", " + n.y + ")");
+            check(Math.abs(c.spots[st.noteId].w - n.w) < 0.01, "the board lays it out at its new size");
+            c.resizeNote(st.noteId, 0, 0);
+            check(Api.get("board", null, ms).notes.find(x => x.id === st.noteId).w === undefined, "Reset Size goes back to the card size");
+            Api.call("undo");
+            check(Math.abs(Api.get("board", null, ms).notes.find(x => x.id === st.noteId).w - n.w) < 0.01, "Undo brings the size back");
+            Theme.boardSnap = true;
+            c.resizeNote(st.noteId, 251, 133);
+            const sn = Api.get("board", null, ms).notes.find(x => x.id === st.noteId);
+            check(sn.w === 260 && sn.h === 140, "with Snap to Grid the size snaps too (" + sn.w + "×" + sn.h + ")");
+            c.resizeNote(st.noteId, 5000, 1);
+            const big = Api.get("board", null, ms).notes.find(x => x.id === st.noteId);
+            check(big.w === c.noteMax[0] && big.h === c.noteMin[1], "and stays within limits (" + big.w + "×" + big.h + ")");
+            Theme.boardSnap = false;
+            Api.call("removeBoardNote", ms, st.noteId);
+            c.setFreeform(false);
+        }],
+        ["shortcuts", () => {
+            // Window shortcuts need the main window active (the history
+            // window took that earlier).
+            win.requestActivate();
+        }],
+        ["shortcuts", () => {
+            check(win.active, "the main window is active");
+            Shortcuts.resetAll();
+            prefs.openAt("shortcuts");
+            const pg = prefs.shortcutsRef();
+            check(pg.startRecording("project.sprint") && pg.recording === "project.sprint", "clicking a shortcut waits for keys");
+            input.key(win, Qt.Key_P, Qt.ControlModifier);
+        }],
+        ["shortcuts", () => {
+            const pg = prefs.shortcutsRef();
+            check(Shortcuts.seq("project.sprint") === "Ctrl+P" && !goTo.visible, "the keys pressed become the shortcut, without running Go to… (" + Shortcuts.seq("project.sprint") + ")");
+            check(Shortcuts.seq("project.goTo") === "", "Go to… loses Ctrl+P (" + Shortcuts.seq("project.goTo") + ")");
+            check(pg.notice.indexOf("Go to") >= 0, "and the page says so");
+            pg.record("view.styled");
+            pg.keyPressed({ key: Qt.Key_Escape, modifiers: 0 });
+            check(pg.recording === "" && Shortcuts.seq("view.styled") === "", "Esc cancels");
+            pg.record("view.spelling");
+            pg.keyPressed({ key: Qt.Key_Control, modifiers: Qt.ControlModifier });
+            check(pg.recording === "view.spelling", "a modifier on its own keeps waiting");
+            pg.keyPressed({ key: Qt.Key_Backspace, modifiers: 0 });
+            check(Shortcuts.seq("view.spelling") === "", "Backspace removes a shortcut");
+            check(Shortcuts.clash("project.newDocument", "Ctrl+N") === null, "New Document and New Project share Ctrl+N (start screen and project)");
+            prefs.close();
+            input.key(win, Qt.Key_P, Qt.ControlModifier);
+            check(sprint.visible, "the menu command runs on its new keys");
+            sprint.close();
+        }],
+        ["shortcuts", () => {
+            const t = Shortcuts.reset("project.goTo");
+            check(Shortcuts.seq("project.goTo") === "Ctrl+P" && t && t.id === "project.sprint" && Shortcuts.seq("project.sprint") === "", "resetting one takes its keys back from the other");
+            Shortcuts.resetAll();
+            check(Shortcuts.customJson === "{}" && Shortcuts.seq("project.sprint") === "Ctrl+Shift+R" && Shortcuts.seq("view.spelling") === "F7", "Reset All restores the defaults");
+            input.key(win, Qt.Key_F7, Qt.NoModifier);
+            check(!Theme.spellCheck, "F7 works again");
+            Theme.spellCheck = true;
+        }],
+        ["project replace", () => {
+            const sp = ws().binderRef().searchPaneRef();
+            ws().searchFor("lamp"); sp.matchCase = false; sp.wholeWords = false; sp.run();
+            const all = sp.textHits.length, total = sp.replaceCount;
+            check(all >= 2, "the sample has \"lamp\" in several documents (" + all + ")");
+            check(sp.marked("the Lamp room").indexOf("<b>Lamp</b>") >= 0, "matches are bold in the snippets");
+            sp.wholeWords = true;
+            check(sp.replaceCount <= total && sp.marked("lamplight").indexOf("<b>") < 0, "whole words leaves out \"lamplight\" (" + sp.replaceCount + " of " + total + ")");
+            sp.wholeWords = false;
+            ws().searchFor("LAMP"); sp.matchCase = true; sp.run();
+            check(sp.textHits.length === 0, "match case finds no \"LAMP\"");
+            sp.matchCase = false;
+            ws().searchFor("lamp"); sp.run();
+            const first = sp.textHits[0].id, rest = sp.textHits.slice(1).map(h => h.id);
+            st.replaceBefore = [first].concat(rest).map(id => Api.call("text", id));
+            sp.setSkipped(first, true);
+            check(sp.chosenHits.length === all - 1, "unticking a document leaves it out");
+            const r = sp.replace("LANTERN");
+            check(r && r.documents === all - 1, "replace changes the ticked documents (" + JSON.stringify(r) + ")");
+            check(/lamp/i.test(Api.call("text", first)) && rest.every(id => !/lamp/i.test(Api.call("text", id)) && Api.call("text", id).indexOf("LANTERN") >= 0),
+                  "the unticked one keeps its text, the others are replaced");
+            ws().undo();
+            check([first].concat(rest).every((id, i) => Api.call("text", id) === st.replaceBefore[i]), "one Undo puts every document back");
+            ws().searchFor("");
         }],
         ["story bible", () => {
             const dir = Api.get("meta", null).path, base = "file://" + dir.substring(0, dir.lastIndexOf("/")) + "/selftest-bible";

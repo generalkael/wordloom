@@ -4,6 +4,7 @@
 #include "wordloom/src/styling.cxx.h" // spell_ok(), implemented in Rust
 
 #include "inputsim.h"
+#include "keytext.h"
 #include "pdfexport.h"
 
 #include <QRegularExpression>
@@ -645,4 +646,5 @@ void register_styler_types()
     qmlRegisterType<MarkdownStyler>("com.wordloom.styling", 1, 0, "MarkdownStyler");
     qmlRegisterType<PdfExporter>("com.wordloom.styling", 1, 0, "PdfExporter");
     qmlRegisterType<InputSim>("com.wordloom.styling", 1, 0, "InputSim");
+    qmlRegisterType<KeyText>("com.wordloom.styling", 1, 0, "KeyText");
 }

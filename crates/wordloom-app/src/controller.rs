@@ -53,21 +53,24 @@ pub struct WordloomRust {
     redo_text: QString,
 }
 
+/// Wordloom's own config folder (recent projects, personal dictionary,
+/// interface size). The screenshot tour and the self-test keep their own, so
+/// they never touch the user's.
+pub fn config_dir() -> std::path::PathBuf {
+    let tour = std::env::args()
+        .any(|a| a.starts_with("--screenshots=") || a == "--selftest" || a.starts_with("--bench="));
+    dirs::config_dir()
+        .unwrap_or_else(std::env::temp_dir)
+        .join(if tour {
+            "wordloom-screenshots"
+        } else {
+            "wordloom"
+        })
+}
+
 impl Default for WordloomRust {
     fn default() -> Self {
-        // The screenshot tour keeps its own list, so it never adds the
-        // sample project to the user's recent projects.
-        let tour = std::env::args().any(|a| {
-            a.starts_with("--screenshots=") || a == "--selftest" || a.starts_with("--bench=")
-        });
-        let recent_file = dirs::config_dir()
-            .unwrap_or_else(std::env::temp_dir)
-            .join(if tour {
-                "wordloom-screenshots"
-            } else {
-                "wordloom"
-            })
-            .join("recent.json");
+        let recent_file = config_dir().join("recent.json");
         Self {
             app: App::new(recent_file),
             project_open: false,

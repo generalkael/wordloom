@@ -18,6 +18,8 @@ Rectangle {
     property string dropPos: ""
     signal selected(string id)
     signal activated(string id)
+    // A project search result in a document's text: open it at the matches.
+    signal searchHit(string id, string query)
     signal openInSplit(string id)
     signal filesDropped(var urls)
 
@@ -82,6 +84,9 @@ Rectangle {
     function rowIndex(id) { for (let i = 0; i < rows.length; ++i) if (rows[i].id === id) return i; return -1; }
     function startRename(id) { renamingId = id; const i = rowIndex(id); if (i >= 0) list.positionViewAtIndex(i, ListView.Contain); }
     function focusSearch() { searchField.forceActiveFocus(); searchField.selectAll(); }
+    // Edit ▸ Replace in Project…: the replace box if there's a search, else the search box.
+    function replaceInProject() { if (searchField.text.trim()) searchPane.focusReplace(); else focusSearch(); }
+    function searchPaneRef() { return searchPane; }
     function step(delta) {
         const i = rowIndex(currentId);
         const j = Math.max(0, Math.min(rows.length - 1, i + delta));
@@ -167,11 +172,12 @@ Rectangle {
         }
 
         SearchPane {
+            id: searchPane
             Layout.fillWidth: true
             Layout.fillHeight: true
             visible: searchField.text.trim().length > 0
             query: searchField.text
-            onChosen: (id) => pane.activated(id)
+            onChosen: (id, field) => { if (field === "text") pane.searchHit(id, searchField.text.trim()); else pane.activated(id); }
         }
 
         ListView {

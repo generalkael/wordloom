@@ -33,7 +33,17 @@ pub struct BoardNote {
     pub x: f64,
     #[serde(default)]
     pub y: f64,
+    /// Size in board units, if resized on a freeform board (otherwise the
+    /// size of a card).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub w: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub h: Option<f64>,
 }
+
+/// The smallest and largest a note can be made, in board units.
+pub const NOTE_MIN: [f64; 2] = [120.0, 70.0];
+pub const NOTE_MAX: [f64; 2] = [900.0, 700.0];
 
 fn default_note_color() -> String {
     NOTE_COLORS[0].to_string()
@@ -189,6 +199,8 @@ impl Boards {
             color: default_note_color(),
             x,
             y,
+            w: None,
+            h: None,
         });
         Ok(id)
     }
@@ -226,6 +238,22 @@ impl Boards {
         let n = self.note_mut(container, note)?;
         n.x = x;
         n.y = y;
+        Ok(())
+    }
+
+    /// Set a note's size in board units (kept between [`NOTE_MIN`] and
+    /// [`NOTE_MAX`]); zero or less for either goes back to the card size.
+    pub fn resize_note(&mut self, container: NodeId, note: Uuid, w: f64, h: f64) -> Result<()> {
+        if !(w.is_finite() && h.is_finite()) {
+            return Err(Error::Invalid("not a note size".into()));
+        }
+        let n = self.note_mut(container, note)?;
+        if w <= 0.0 || h <= 0.0 {
+            (n.w, n.h) = (None, None);
+        } else {
+            n.w = Some(w.clamp(NOTE_MIN[0], NOTE_MAX[0]).round());
+            n.h = Some(h.clamp(NOTE_MIN[1], NOTE_MAX[1]).round());
+        }
         Ok(())
     }
 

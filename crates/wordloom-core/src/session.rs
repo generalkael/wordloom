@@ -985,16 +985,29 @@ impl Session {
         self.changed();
     }
 
-    pub fn search(&self, q: &str) -> Value {
-        json!(search::search(&self.project, q))
+    pub fn search(&self, q: &str, o: search::Options) -> Value {
+        json!(search::search(&self.project, q, o))
     }
 
-    pub fn replace_all(&mut self, find: &str, rep: &str) -> Value {
-        let (docs, n) = search::replace_all(&mut self.project, find, rep);
+    /// Replace in document text outside the Trash; `only` limits it to those
+    /// documents (empty: every document). One undo step.
+    pub fn replace_all(
+        &mut self,
+        find: &str,
+        rep: &str,
+        o: search::Options,
+        only: &[String],
+    ) -> Result<Value> {
+        let ids = only
+            .iter()
+            .map(|s| parse_id(s))
+            .collect::<Result<Vec<_>>>()?;
+        let scope = (!ids.is_empty()).then_some(ids.as_slice());
+        let (docs, n) = search::replace_all(&mut self.project, find, rep, o, scope);
         if n > 0 {
             self.changed();
         }
-        json!({"documents": docs, "replacements": n})
+        Ok(json!({"documents": docs, "replacements": n}))
     }
 
     pub fn stats(&self, today: Option<NaiveDate>) -> Value {
@@ -1576,6 +1589,15 @@ impl Session {
         self.project
             .boards
             .color_note(parse_id(container)?, parse_id(note)?, color)?;
+        self.changed();
+        Ok(())
+    }
+
+    /// Resize a note on a freeform board (zero: back to the card size).
+    pub fn resize_board_note(&mut self, container: &str, note: &str, w: f64, h: f64) -> Result<()> {
+        self.project
+            .boards
+            .resize_note(parse_id(container)?, parse_id(note)?, w, h)?;
         self.changed();
         Ok(())
     }

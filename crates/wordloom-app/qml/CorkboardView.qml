@@ -105,12 +105,13 @@ Rectangle {
     // Where every item sits ({id: {x, y}} in board units). Cards that were
     // never placed take the first grid slots no placed card or note covers.
     readonly property var spots: layoutItems(items, board.positions, freeColumns)
-    function overlaps(r, x, y) { return x < r.x + baseW + gapU / 2 && r.x < x + baseW + gapU / 2 && y < r.y + baseH + gapU / 2 && r.y < y + baseH + gapU / 2; }
+    function overlaps(r, x, y) { return x < r.x + r.w + gapU / 2 && r.x < x + baseW + gapU / 2 && y < r.y + r.h + gapU / 2 && r.y < y + baseH + gapU / 2; }
     function layoutItems(list, positions, cols) {
         const out = {}, taken = [];
         for (const it of list) {
             const p = it.note ? [it.x, it.y] : positions[it.id];
-            if (p) { out[it.id] = { x: p[0], y: p[1] }; taken.push(out[it.id]); }
+            // Notes can be resized (board units); cards are all one size.
+            if (p) { out[it.id] = { x: p[0], y: p[1], w: (it.note && it.w) || baseW, h: (it.note && it.h) || baseH }; taken.push(out[it.id]); }
         }
         let slot = 0;
         for (const it of list) {
@@ -124,7 +125,7 @@ Rectangle {
     function freeSlot(taken, cols, from) {
         for (let s = from || 0; ; ++s) {
             const x = (s % cols) * (baseW + gapU), y = Math.floor(s / cols) * (baseH + gapU);
-            if (!taken.some(r => overlaps(r, x, y))) return { x: x, y: y, slot: s };
+            if (!taken.some(r => overlaps(r, x, y))) return { x: x, y: y, w: baseW, h: baseH, slot: s };
         }
     }
     // The first empty slot on the board (for a new note).
@@ -140,7 +141,7 @@ Rectangle {
     // `skip`: an id, or a list of ids, to look through (what's being dragged).
     function idAtBoard(px, py, skip) {
         const x = toUnits(px), y = toUnits(py), skips = Array.isArray(skip) ? skip : [skip];
-        const hit = freeOrder.slice().reverse().find(it => { const p = spots[it.id]; return skips.indexOf(it.id) < 0 && p && x >= p.x && x <= p.x + baseW && y >= p.y && y <= p.y + baseH; });
+        const hit = freeOrder.slice().reverse().find(it => { const p = spots[it.id]; return skips.indexOf(it.id) < 0 && p && x >= p.x && x <= p.x + p.w && y >= p.y && y <= p.y + p.h; });
         return hit ? hit.id : "";
     }
     // Freeform: while a card is dragged over the middle of a folder card,
@@ -204,7 +205,7 @@ Rectangle {
     function pickInBox(a, b, base) {
         const x0 = toUnits(Math.min(a.x, b.x)), x1 = toUnits(Math.max(a.x, b.x));
         const y0 = toUnits(Math.min(a.y, b.y)), y1 = toUnits(Math.max(a.y, b.y));
-        const inside = freeOrder.filter(it => { const p = spots[it.id]; return p.x <= x1 && p.x + baseW >= x0 && p.y <= y1 && p.y + baseH >= y0; }).map(it => it.id);
+        const inside = freeOrder.filter(it => { const p = spots[it.id]; return p.x <= x1 && p.x + p.w >= x0 && p.y <= y1 && p.y + p.h >= y0; }).map(it => it.id);
         picked = base.concat(inside.filter(id => base.indexOf(id) < 0));
         if (inside.length) keyId = inside[0];
     }
@@ -234,6 +235,23 @@ Rectangle {
     // Snap to Grid (Arrange menu): board units onto a 20-unit grid.
     readonly property int gridStep: 20
     function snap(u) { return Theme.boardSnap ? Math.round(u / gridStep) * gridStep : u; }
+    // Note sizes, in board units (boards.rs NOTE_MIN / NOTE_MAX).
+    readonly property var noteMin: [120, 70]
+    readonly property var noteMax: [900, 700]
+    // Resize a note on a freeform board to (w, h) units, snapped like
+    // positions; zero goes back to the card size.
+    function resizeNote(id, w, h) {
+        if (w > 0 && h > 0) {
+            w = Math.max(noteMin[0], Math.min(noteMax[0], snap(w)));
+            h = Math.max(noteMin[1], Math.min(noteMax[1], snap(h)));
+        }
+        return Api.call("resizeBoardNote", containerId, id, w, h);
+    }
+    // Window point of note `id`'s resize grip (self-test).
+    function noteGrip(id) {
+        const r = freeRep.count ? [...Array(freeRep.count).keys()].map(i => freeRep.itemAt(i)).find(it => it && it.modelData.id === id) : null;
+        return r ? r.mapToItem(null, r.width - 5, r.height - 5) : null;
+    }
     // Add a note; in freeform at (x, y) units, else (or with no spot) in the
     // first free slot. Returns its id and focuses its text.
     function addNote(at) {
@@ -666,8 +684,8 @@ Rectangle {
                 id: freeContent
                 width: freeView.contentWidth
                 height: freeView.contentHeight
-                readonly property real extentX: { let m = 0; for (const id in cb.spots) m = Math.max(m, cb.toView(cb.spots[id].x) + cb.cardWidth); return m + cb.margin; }
-                readonly property real extentY: { let m = 0; for (const id in cb.spots) m = Math.max(m, cb.toView(cb.spots[id].y) + cb.cardHeight); return m + cb.margin; }
+                readonly property real extentX: { let m = 0; for (const id in cb.spots) m = Math.max(m, cb.toView(cb.spots[id].x + cb.spots[id].w)); return m + cb.margin; }
+                readonly property real extentY: { let m = 0; for (const id in cb.spots) m = Math.max(m, cb.toView(cb.spots[id].y + cb.spots[id].h)); return m + cb.margin; }
                 // Shows that the keys go to the board.
                 Rectangle {
                     x: freeView.contentX + 2; y: freeView.contentY + 2
@@ -731,7 +749,10 @@ Rectangle {
                         required property var modelData
                         required property int index
                         property alias face: freeFace
-                        readonly property var at: cb.spots[modelData.id] || { x: 0, y: 0 }
+                        readonly property var at: cb.spots[modelData.id] || { x: 0, y: 0, w: cb.baseW, h: cb.baseH }
+                        // The size while a note's corner is being dragged (-1: as saved).
+                        property real liveW: -1
+                        property real liveH: -1
                         // Picked ones follow the one being dragged.
                         readonly property bool follows: cb.groupLead !== "" && cb.groupLead !== modelData.id && cb.isPicked(modelData.id)
                         x: cb.toView(at.x) + (follows ? cb.groupDx : 0)
@@ -742,8 +763,8 @@ Rectangle {
                             x = Qt.binding(() => cb.toView(at.x) + (follows ? cb.groupDx : 0));
                             y = Qt.binding(() => cb.toView(at.y) + (follows ? cb.groupDy : 0));
                         }
-                        width: cb.cardWidth
-                        height: cb.cardHeight
+                        width: liveW >= 0 ? liveW : at.w * cb.unit
+                        height: liveH >= 0 ? liveH : at.h * cb.unit
                         // The one being moved, and the highlighted one, on top.
                         z: freeFace.moving ? 10 : follows ? 9 : cb.keyId === modelData.id ? 2 : 1
                         CardFace {
@@ -907,6 +928,52 @@ Rectangle {
                 }
             }
         }
+        // Freeform notes: drag the bottom-right corner to resize.
+        Item {
+            id: grip
+            visible: face.isNote && !!face.mover
+            anchors.right: parent.right
+            anchors.bottom: parent.bottom
+            width: 16; height: 16
+            z: 3
+            Canvas {
+                anchors.fill: parent
+                anchors.margins: 3
+                opacity: gripHover.hovered || gripDrag.active ? 0.8 : 0.4
+                onPaint: {
+                    const g = getContext("2d");
+                    g.reset(); g.strokeStyle = "#000"; g.lineWidth = 1.2;
+                    for (const k of [4, 8]) { g.beginPath(); g.moveTo(width, height - k); g.lineTo(width - k, height); g.stroke(); }
+                }
+            }
+            HoverHandler { id: gripHover; cursorShape: Qt.SizeFDiagCursor }
+            DragHandler {
+                id: gripDrag
+                target: null
+                acceptedButtons: Qt.LeftButton
+                grabPermissions: PointerHandler.CanTakeOverFromAnything
+                cursorShape: Qt.SizeFDiagCursor
+                property real w0: 0
+                property real h0: 0
+                onActiveChanged: {
+                    const m = face.mover;
+                    if (!m) return;
+                    if (active) { cb.keyId = face.modelData.id; w0 = m.width; h0 = m.height; return; }
+                    const w = m.width / cb.unit, h = m.height / cb.unit;
+                    m.liveW = -1; m.liveH = -1;
+                    cb.resizeNote(face.modelData.id, w, h);
+                }
+                onTranslationChanged: {
+                    const m = face.mover;
+                    if (!active || !m) return;
+                    m.liveW = Math.max(cb.noteMin[0], Math.min(cb.noteMax[0], (w0 + translation.x) / cb.unit)) * cb.unit;
+                    m.liveH = Math.max(cb.noteMin[1], Math.min(cb.noteMax[1], (h0 + translation.y) / cb.unit)) * cb.unit;
+                }
+            }
+            ToolTip.visible: gripHover.hovered && !gripDrag.active
+            ToolTip.delay: 600
+            ToolTip.text: qsTr("Drag to resize")
+        }
         // The keyboard highlight.
         Rectangle {
             anchors.fill: parent
@@ -966,6 +1033,12 @@ Rectangle {
             MenuItem {
                 text: qsTr("Make into Document")
                 onTriggered: { synopsis.focus = false; cb.noteToDocument(face.modelData.id); }
+            }
+            MenuItem {
+                text: qsTr("Reset Size")
+                visible: !!face.mover && !!face.modelData.w
+                height: visible ? implicitHeight : 0
+                onTriggered: cb.resizeNote(face.modelData.id, 0, 0)
             }
             MenuItem { text: qsTr("Delete Note"); onTriggered: Api.call("removeBoardNote", cb.containerId, face.modelData.id) }
         }

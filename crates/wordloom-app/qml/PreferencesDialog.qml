@@ -23,7 +23,8 @@ Dialog {
         { id: "editor", name: qsTr("Editor") },
         { id: "writing", name: qsTr("Spelling & Typing") },
         { id: "corkboard", name: qsTr("Corkboard") },
-        { id: "backups", name: qsTr("Backups") }
+        { id: "backups", name: qsTr("Backups") },
+        { id: "shortcuts", name: qsTr("Keyboard Shortcuts") }
     ]
     property string page: "general"
     // Open on one page ("font" from the editor's Aa button, …).
@@ -37,6 +38,7 @@ Dialog {
         fontFilter = "";
         familyList.positionViewAtIndex(Math.max(0, families.indexOf(Theme.editorFont)), ListView.Center);
         spellInfo = Api.call("spellLanguages") || spellInfo;
+        scaleInfo = Api.call("uiScale") || scaleInfo;
         loadWords();
     }
 
@@ -46,6 +48,14 @@ Dialog {
         { v: 30, name: qsTr("Every 30 seconds") }, { v: 60, name: qsTr("Every minute") },
         { v: 300, name: qsTr("Every 5 minutes") }
     ]
+    // Interface size: saved for the next start (uiscale.rs).
+    readonly property var scales: [0.75, 0.9, 1.0, 1.1, 1.25, 1.5, 1.75, 2.0]
+    property var scaleInfo: ({ saved: 1, running: 1 })
+    function setScale(f) {
+        const r = Api.call("setUiScale", f);
+        if (r !== undefined) scaleInfo = { saved: r, running: scaleInfo.running };
+        return r;
+    }
     function folderText(u) { return decodeURIComponent(String(u).replace(/^file:\/\//, "")); }
 
     // ---- Font & Spacing ----
@@ -187,6 +197,22 @@ Dialog {
                         model: [qsTr("Follow the system"), qsTr("Light"), qsTr("Dark")]
                         currentIndex: ["", "light", "dark"].indexOf(Theme.forced)
                         onActivated: (i) => Theme.forced = ["", "light", "dark"][i]
+                    }
+                    RowLayout {
+                        Label { text: qsTr("Interface size"); color: Theme.text }
+                        ComboBox {
+                            id: scaleBox
+                            Layout.preferredWidth: 150
+                            model: pd.scales.map(f => f === 1 ? qsTr("100% (default)") : Math.round(f * 100) + "%")
+                            currentIndex: pd.scales.findIndex(f => Math.abs(f - pd.scaleInfo.saved) < 0.001)
+                            displayText: currentIndex >= 0 ? currentText : Math.round(pd.scaleInfo.saved * 100) + "%"
+                            onActivated: (i) => pd.setScale(pd.scales[i])
+                        }
+                    }
+                    Note {
+                        text: Math.abs(pd.scaleInfo.saved - pd.scaleInfo.running) > 0.001
+                            ? qsTr("Wordloom will use %1 the next time it starts (now %2).").arg(Math.round(pd.scaleInfo.saved * 100) + "%").arg(Math.round(pd.scaleInfo.running * 100) + "%")
+                            : qsTr("Scales menus, panels, dialogs and the editor together. Changes take effect the next time Wordloom starts.")
                     }
                     Heading { text: qsTr("Starting up") }
                     CheckBox {
@@ -605,6 +631,10 @@ Dialog {
                     Note { text: qsTr("Backups are named like “Title autobackup 2026-11-06 1730.zip”. If nothing has changed since the last one, no new zip is made. Older automatic backups beyond the number kept are deleted; other files in the folder, including ones made with Back Up to Zip, are left alone. Choose a folder on another drive or a synced cloud folder so a backup survives losing this disk.") }
                 }
             }
+
+            // ---------------- Keyboard Shortcuts ----------------
+            ShortcutsPage { id: shortcutsPage }
         }
     }
+    function shortcutsRef() { return shortcutsPage; }
 }

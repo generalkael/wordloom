@@ -5,6 +5,18 @@ Notable changes to Wordloom. Each entry lands in the same commit as the change i
 ## Unreleased
 
 ### Added
+- **Custom keyboard shortcuts.** Preferences ▸ Keyboard Shortcuts lists every menu command with its
+  keys. Click one and press new keys; a command that had them loses them. ↺ and *Reset All* go back
+  to the defaults.
+- **Interface size.** Preferences ▸ General scales the whole interface (75% to 200%) from the next
+  start, for high-resolution screens or easier reading.
+- **Resizable notes.** On a freeform corkboard, drag a note's bottom-right corner to make it
+  bigger or smaller (snapping with Snap to Grid). Right-click ▸ *Reset Size* goes back to a card's
+  size. Each resize is one undo step.
+- **Better replace across the project.** The binder's search has *Aa* (match case) and *Word*
+  (whole words) switches, shows each match in bold, and ticks every document it found in the
+  text; untick the ones to leave alone, then *Replace N*. A result opens with the search in the
+  find bar. Edit ▸ Find in Project and Edit ▸ Replace in Project… lead there.
 - **Preferences.** Edit ▸ Preferences… (Ctrl+,) gathers the app-wide settings on six pages:
   General, Font & Spacing, Editor, Spelling & Typing, Corkboard and Backups. New there: reopen the
   last project at startup, how often to autosave (5 seconds to 5 minutes), the folder New Project
@@ -197,6 +209,8 @@ Notable changes to Wordloom. Each entry lands in the same commit as the change i
   `Cargo.lock`), as Flathub requires, and the AppStream metadata has screenshots.
 
 ### Fixed
+- Replace All across the project also changed documents in the Trash, which the search itself
+  leaves out.
 - On a freeform corkboard, undoing a card move left the card drawn where it had been dropped.
 - **Split editor follows focus.** Picking a document in the binder always replaced the main
   editor's document, even while you were writing in the split editor. It now opens in the pane

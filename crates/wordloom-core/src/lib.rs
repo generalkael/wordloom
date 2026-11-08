@@ -39,6 +39,7 @@ pub mod stats;
 pub mod storage;
 pub mod templates;
 pub mod timeline;
+pub mod uiscale;
 mod zip;
 
 pub use model::{FlatRow, Label, Node, NodeId, NodeKind, Project, RootRole, Status};

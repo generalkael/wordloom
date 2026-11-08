@@ -236,6 +236,7 @@ Item {
     }
     function mergeNext() { if (focusedId) { flush(); Api.call("mergeWithNext", focusedId); } }
     function focusSearch() { binder.focusSearch(); }
+    function replaceInProject() { binder.replaceInProject(); }
     // Find (and replace) in the open document: the split editor if you are
     // typing there, otherwise the main editor.
     function mainEditor() { return editorView; }
@@ -420,6 +421,7 @@ Item {
                 currentId: ws.focusedId
                 onSelected: (id) => ws.select(id)
                 onActivated: (id) => ws.select(id, "editor")
+                onSearchHit: (id, q) => ws.showMention(id, q)
                 onOpenInSplit: (id) => ws.openInSplit(id)
                 onFilesDropped: (urls) => ws.importFiles(urls)
             }
