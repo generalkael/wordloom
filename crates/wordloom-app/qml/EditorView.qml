@@ -866,11 +866,11 @@ Rectangle {
                     required property string modelData
                     required property int index
                     width: completionBox.width - 8
-                    height: 24
+                    height: Theme.px(24)
                     radius: 3
                     color: index === ev.completionIndex ? Theme.accentSoft : "transparent"
                     Label { anchors.verticalCenter: parent.verticalCenter; x: 6; text: modelData; textFormat: Text.PlainText; color: Theme.text; font.bold: index === ev.completionIndex }
-                    Label { visible: index === ev.completionIndex; anchors.verticalCenter: parent.verticalCenter; anchors.right: parent.right; anchors.rightMargin: 6; text: qsTr("Tab"); color: Theme.subtext; font.pixelSize: 10 }
+                    Label { visible: index === ev.completionIndex; anchors.verticalCenter: parent.verticalCenter; anchors.right: parent.right; anchors.rightMargin: 6; text: qsTr("Tab"); color: Theme.subtext; font.pixelSize: Theme.px(10) }
                     TapHandler { onTapped: { ev.completionIndex = index; ev.acceptCompletion(); } }
                 }
             }
@@ -976,7 +976,7 @@ Rectangle {
             Label {
                 text: de.docTitle
                 color: de.isFolder ? Theme.accent : Theme.subtext
-                font.pixelSize: de.isFolder ? 13 : 11
+                font.pixelSize: Theme.px(de.isFolder ? 13 : 11)
                 font.bold: de.isFolder
                 font.capitalization: Font.AllUppercase
                 MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: ev.openRequested(de.docId) }

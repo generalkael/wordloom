@@ -86,7 +86,7 @@ Rectangle {
                     spacing: 6
 
                     Item { Layout.preferredHeight: 4 }
-                    Label { text: qsTr("Title"); color: Theme.subtext; font.pixelSize: 11 }
+                    Label { text: qsTr("Title"); color: Theme.subtext; font.pixelSize: Theme.px(11) }
                     TextField {
                         Layout.fillWidth: true
                         text: ip.node ? ip.node.title : ""
@@ -95,7 +95,7 @@ Rectangle {
                         onEditingFinished: if (ip.node && text !== ip.node.title) ip.set("title", text)
                     }
 
-                    Label { text: qsTr("Synopsis"); color: Theme.subtext; font.pixelSize: 11 }
+                    Label { text: qsTr("Synopsis"); color: Theme.subtext; font.pixelSize: Theme.px(11) }
                     Rectangle {
                         Layout.fillWidth: true
                         Layout.preferredHeight: 120
@@ -173,7 +173,7 @@ Rectangle {
                             required property string modelData
                             Layout.fillWidth: true
                             spacing: 1
-                            Label { text: modelData; color: Theme.subtext; font.pixelSize: 11 }
+                            Label { text: modelData; color: Theme.subtext; font.pixelSize: Theme.px(11) }
                             TextField {
                                 Layout.fillWidth: true
                                 text: ip.node && ip.node.fields[modelData] ? ip.node.fields[modelData] : ""
@@ -214,7 +214,7 @@ Rectangle {
                         visible: ip.node !== null && ip.node.kind === "character" && ip.node.relations.length === 0
                         text: qsTr("None yet. Connect characters on the relationship map.")
                         color: Theme.subtext
-                        font.pixelSize: 11
+                        font.pixelSize: Theme.px(11)
                         wrapMode: Text.Wrap
                         Layout.fillWidth: true
                     }
@@ -252,7 +252,7 @@ Rectangle {
                                 .arg(ip.appearances.names.map(n => "“" + n + "”").join(", "))
                         textFormat: Text.PlainText
                         color: Theme.subtext
-                        font.pixelSize: 11
+                        font.pixelSize: Theme.px(11)
                         wrapMode: Text.Wrap
                         Layout.fillWidth: true
                     }
@@ -261,7 +261,7 @@ Rectangle {
                     Label {
                         Layout.fillWidth: true
                         color: Theme.subtext
-                        font.pixelSize: 11
+                        font.pixelSize: Theme.px(11)
                         wrapMode: Text.Wrap
                         text: ip.node ? qsTr("%1 words here · %2 including children · %3 characters\nCreated %4\nModified %5")
                             .arg(Api.fmtNumber(ip.node.words)).arg(Api.fmtNumber(ip.node.total_words)).arg(Api.fmtNumber(ip.node.chars))
@@ -292,7 +292,7 @@ Rectangle {
                         contentItem: ColumnLayout {
                             spacing: 0
                             Label { text: modelData.text || qsTr("(empty comment)"); textFormat: Text.PlainText; color: Theme.text; wrapMode: Text.Wrap; maximumLineCount: 3; elide: Text.ElideRight; Layout.fillWidth: true }
-                            Label { visible: modelData.node !== ip.nodeId; text: modelData.title; color: Theme.subtext; font.pixelSize: 11; elide: Text.ElideRight; Layout.fillWidth: true }
+                            Label { visible: modelData.node !== ip.nodeId; text: modelData.title; color: Theme.subtext; font.pixelSize: Theme.px(11); elide: Text.ElideRight; Layout.fillWidth: true }
                         }
                     }
                 }
@@ -301,7 +301,7 @@ Rectangle {
                     text: qsTr("None. Ctrl+Alt+M (or { } on the format bar) adds one: {>> like this <<}. Comments aren't counted or exported.")
                     textFormat: Text.PlainText
                     color: Theme.subtext
-                    font.pixelSize: 11
+                    font.pixelSize: Theme.px(11)
                     wrapMode: Text.Wrap
                     Layout.fillWidth: true
                     Layout.leftMargin: 8
@@ -356,7 +356,7 @@ Rectangle {
                             Label { text: modelData.title; color: Theme.text; elide: Text.ElideRight; Layout.fillWidth: true }
                             Label {
                                 text: new Date(modelData.created).toLocaleString(Qt.locale(), Locale.ShortFormat) + (modelData.group ? " · " + (modelData.count === 1 ? qsTr("1 document") : qsTr("%1 documents").arg(modelData.count)) : "")
-                                color: Theme.subtext; font.pixelSize: 11
+                                color: Theme.subtext; font.pixelSize: Theme.px(11)
                             }
                         }
                     }

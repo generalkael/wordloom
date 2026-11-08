@@ -864,7 +864,7 @@ Rectangle {
                 placeholderText: face.isNote ? qsTr("Write a note…") : qsTr("Synopsis…")
                 wrapMode: TextEdit.Wrap
                 font.family: Theme.editorFont
-                font.pixelSize: 13
+                font.pixelSize: Theme.px(13)
                 color: Theme.ink
                 background: null
                 padding: 0
@@ -880,13 +880,13 @@ Rectangle {
             RowLayout {
                 Layout.fillWidth: true
                 visible: !face.isNote
-                Label { text: face.modelData.status_name || ""; color: Theme.accent; font.pixelSize: 10; font.bold: true; font.capitalization: Font.AllUppercase }
+                Label { text: face.modelData.status_name || ""; color: Theme.accent; font.pixelSize: Theme.px(10); font.bold: true; font.capitalization: Font.AllUppercase }
                 Item { Layout.fillWidth: true }
                 Label {
                     text: face.isNote ? "" : Api.fmtNumber(face.modelData.total_words) + (face.modelData.target_words ? "/" + Api.fmtNumber(face.modelData.target_words) : "") + qsTr(" w")
-                    color: Theme.subtext; font.pixelSize: 10
+                    color: Theme.subtext; font.pixelSize: Theme.px(10)
                 }
-                Label { visible: face.modelData.child_count > 0; text: "▤ " + face.modelData.child_count; color: Theme.subtext; font.pixelSize: 10 }
+                Label { visible: face.modelData.child_count > 0; text: "▤ " + face.modelData.child_count; color: Theme.subtext; font.pixelSize: Theme.px(10) }
             }
         }
 
@@ -1064,7 +1064,7 @@ Rectangle {
         x: Math.max(4, Math.min(cb.width - width - 4, cb.dragPos.x + 14))
         y: Math.max(4, Math.min(cb.height - height - 4, cb.dragPos.y + 10))
         width: Math.min(cb.cardWidth, 220)
-        height: 28
+        height: Theme.px(28)
         radius: 3
         color: Theme.card
         border.color: Theme.accent

@@ -117,7 +117,7 @@ Dialog {
                         model: [qsTr("Courier"), qsTr("Times")]
                     }
                 }
-                Label { visible: dlg.manuscriptStyle; text: qsTr("Your name and contact details (title page)"); font.pixelSize: 11; color: Theme.subtext }
+                Label { visible: dlg.manuscriptStyle; text: qsTr("Your name and contact details (title page)"); font.pixelSize: Theme.px(11); color: Theme.subtext }
                 TextArea {
                     id: contactField
                     visible: dlg.manuscriptStyle
@@ -160,7 +160,7 @@ Dialog {
                 Layout.fillWidth: true
                 wrapMode: Text.Wrap
                 color: Theme.subtext
-                font.pixelSize: 11
+                font.pixelSize: Theme.px(11)
                 text: dlg.isPdf
                     ? (dlg.manuscriptStyle
                         ? qsTr("Standard manuscript format: double spaced, a title page with your contact details and the word count, each chapter a third of the way down a new page, and “%1 / %2 / page” at the top right of every page.").arg(dlg.surname() || qsTr("Surname")).arg(dlg.shortTitle().toUpperCase())

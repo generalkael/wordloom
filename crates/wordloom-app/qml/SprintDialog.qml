@@ -142,7 +142,7 @@ Dialog {
             Label {
                 Layout.alignment: Qt.AlignHCenter
                 text: sd.clock
-                font.pixelSize: 56
+                font.pixelSize: Theme.px(56)
                 font.bold: true
                 color: sd.paused ? Theme.subtext : Theme.text
             }
@@ -195,7 +195,7 @@ Dialog {
                     .arg(sd.summary.best_words !== null ? Api.fmtNumber(sd.summary.best_words) : "—")
                     .arg(sd.summary.best_pace !== null ? sd.summary.best_pace.toFixed(1) : "—")
                 color: Theme.subtext
-                font.pixelSize: 11
+                font.pixelSize: Theme.px(11)
                 wrapMode: Text.Wrap
                 Layout.fillWidth: true
             }

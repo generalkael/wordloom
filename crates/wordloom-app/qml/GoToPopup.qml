@@ -59,7 +59,7 @@ Popup {
             visible: field.text.trim() === ""
             text: qsTr("Recently changed")
             color: Theme.subtext
-            font.pixelSize: 11
+            font.pixelSize: Theme.px(11)
         }
         ListView {
             id: list
@@ -74,7 +74,7 @@ Popup {
                 required property var modelData
                 required property int index
                 width: ListView.view.width
-                height: 44
+                height: Theme.px(44)
                 highlighted: ListView.isCurrentItem
                 onClicked: gp.choose(index)
                 contentItem: RowLayout {
@@ -84,7 +84,7 @@ Popup {
                         spacing: 0
                         Layout.fillWidth: true
                         Label { text: modelData.title || qsTr("Untitled"); textFormat: Text.PlainText; color: row.highlighted ? row.palette.highlightedText : modelData.in_trash ? Theme.subtext : Theme.text; elide: Text.ElideRight; Layout.fillWidth: true }
-                        Label { text: modelData.path; textFormat: Text.PlainText; color: row.highlighted ? row.palette.highlightedText : Theme.subtext; opacity: row.highlighted ? 0.85 : 1; font.pixelSize: 11; elide: Text.ElideMiddle; Layout.fillWidth: true }
+                        Label { text: modelData.path; textFormat: Text.PlainText; color: row.highlighted ? row.palette.highlightedText : Theme.subtext; opacity: row.highlighted ? 0.85 : 1; font.pixelSize: Theme.px(11); elide: Text.ElideMiddle; Layout.fillWidth: true }
                     }
                 }
             }

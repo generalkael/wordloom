@@ -48,7 +48,7 @@ Dialog {
                 required property string modelData
                 width: ListView.view.width
                 contentItem: RowLayout {
-                    Label { text: row.modelData; color: Theme.text; Layout.fillWidth: true; font.pixelSize: 15 }
+                    Label { text: row.modelData; color: Theme.text; Layout.fillWidth: true; font.pixelSize: Theme.px(15) }
                     ToolButton {
                         text: dlg.added[row.modelData] ? qsTr("Added ✓") : qsTr("Add as Character")
                         enabled: !dlg.added[row.modelData]
@@ -64,7 +64,7 @@ Dialog {
             Layout.fillWidth: true
             wrapMode: Text.Wrap
             color: Theme.subtext
-            font.pixelSize: 11
+            font.pixelSize: Theme.px(11)
             text: qsTr("Real-world styles pair common given names with surnames; Fantasy builds new names from syllables. Generate again for a fresh list.")
         }
     }

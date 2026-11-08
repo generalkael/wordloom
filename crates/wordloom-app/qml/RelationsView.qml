@@ -18,7 +18,7 @@ Rectangle {
     signal selectRequested(string id)
 
     readonly property int cardW: 168
-    readonly property int cardH: 52
+    readonly property int cardH: Theme.px(52)
     readonly property int rev: Wordloom.revision
     onRevChanged: if (active) reload()
     onActiveChanged: if (active) reload()
@@ -150,7 +150,7 @@ Rectangle {
                             anchors.centerIn: parent
                             text: link.modelData.label || qsTr("(unlabelled)")
                             color: link.modelData.label ? Theme.text : Theme.subtext
-                            font.pixelSize: 12
+                            font.pixelSize: Theme.px(12)
                             font.italic: !link.modelData.label
                         }
                         HoverHandler { cursorShape: Qt.PointingHandCursor }
@@ -188,7 +188,7 @@ Rectangle {
                             Layout.fillWidth: true
                             spacing: 0
                             Label { text: card.modelData.title; font.bold: true; color: Theme.text; elide: Text.ElideRight; Layout.fillWidth: true }
-                            Label { visible: text !== ""; text: card.modelData.synopsis; color: Theme.subtext; font.pixelSize: 11; elide: Text.ElideRight; Layout.fillWidth: true }
+                            Label { visible: text !== ""; text: card.modelData.synopsis; color: Theme.subtext; font.pixelSize: Theme.px(11); elide: Text.ElideRight; Layout.fillWidth: true }
                         }
                     }
 
@@ -309,7 +309,7 @@ Rectangle {
                         required property string modelData
                         text: modelData
                         flat: true
-                        font.pixelSize: 11
+                        font.pixelSize: Theme.px(11)
                         onClicked: labelField.text = modelData
                     }
                 }

@@ -7,7 +7,7 @@ import com.wordloom.app
 
 // Word Count History: words written (bars) or the running total (line) over
 // a preset or custom date range, grouped by day, week, month or year.
-Window {
+ApplicationWindow {
     id: hw
     title: qsTr("Word Count History")
     width: 920
@@ -18,6 +18,10 @@ Window {
     // A separate window doesn't inherit the main window's palette; without
     // this, controls follow the system colours even when the app is forced
     // light or dark (light boxes with light text).
+    // Preferences ▸ Interface; controls, dialogs and menus inherit it. (Set
+    // per property: assigning a whole Qt.font() here hangs at startup.)
+    font.family: Theme.uiFont || Theme.systemFont.family
+    font.pointSize: Theme.uiPointSize
     palette.window: Theme.window
     palette.base: Theme.base
     palette.alternateBase: Theme.panel
@@ -205,8 +209,8 @@ Window {
                 delegate: ColumnLayout {
                     required property var modelData
                     spacing: 0
-                    Label { text: modelData[0]; color: Theme.subtext; font.pixelSize: 11 }
-                    Label { text: modelData[1]; color: Theme.text; font.pixelSize: 18 }
+                    Label { text: modelData[0]; color: Theme.subtext; font.pixelSize: Theme.px(11) }
+                    Label { text: modelData[1]; color: Theme.text; font.pixelSize: Theme.px(18) }
                 }
             }
             Item { Layout.fillWidth: true }
@@ -243,7 +247,7 @@ Window {
                         Label {
                             x: -width - 8; y: -height / 2
                             text: Api.fmtNumber(Math.round(parent.v))
-                            color: Theme.subtext; font.pixelSize: 11
+                            color: Theme.subtext; font.pixelSize: Theme.px(11)
                         }
                     }
                 }
@@ -278,7 +282,7 @@ Window {
                     visible: hw.showGoal
                     x: plot.width - width; y: hw.showGoal ? plot.yOf(hw.target) - height - 2 : 0
                     text: qsTr("Daily goal %1").arg(Api.fmtNumber(hw.target || 0))
-                    color: Theme.ok; font.pixelSize: 11
+                    color: Theme.ok; font.pixelSize: Theme.px(11)
                 }
                 // Line (running totals)
                 Shape {
@@ -338,7 +342,7 @@ Window {
                         visible: index % every === 0
                         text: hw.bucketLabel(modelData, false)
                         color: Theme.subtext
-                        font.pixelSize: 11
+                        font.pixelSize: Theme.px(11)
                         x: index * plot.slot + plot.slot / 2 - width / 2
                         y: plot.height + 8
                     }
@@ -357,7 +361,7 @@ Window {
             Layout.fillWidth: true
             wrapMode: Text.Wrap
             color: Theme.subtext
-            font.pixelSize: 11
+            font.pixelSize: Theme.px(11)
             text: qsTr("Words written are net words added to the manuscript each day (cuts count against them). Totals are recorded each time the project saves. History is kept in the project file.")
         }
     }

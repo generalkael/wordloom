@@ -28,6 +28,21 @@ QtObject {
     readonly property color paper: dark ? "#25272b" : "#fffefb"
     readonly property color ink: dark ? "#dcd9d2" : "#1d1c19"
 
+    // The interface font (Preferences ▸ Interface): menus, panels, dialogs,
+    // the binder, cards and lists. "" and 0 follow the system. The editor
+    // has its own font, below.
+    property string uiFont: ""
+    property real uiFontSize: 0          // points
+    readonly property font systemFont: Qt.application.font   // never set, so it stays the system's
+    readonly property real systemPointSize: systemFont.pointSize > 0 ? systemFont.pointSize : Math.max(6, systemFont.pixelSize * 0.75)
+    readonly property real uiPointSize: uiFontSize > 0 ? uiFontSize : systemPointSize
+    // How much bigger than the system's the interface text is; sizes in the
+    // QML were chosen for the system font, so they scale by this.
+    readonly property real uiTextScale: uiPointSize / systemPointSize
+    // A size in pixels designed for the system font, at the chosen size.
+    function px(n) { return Math.max(1, Math.round(n * uiTextScale)); }
+    function resetUiFont() { uiFont = ""; uiFontSize = 0; }
+
     // The writing font (View ▸ Editor Font & Spacing…). If it isn't
     // installed, Qt substitutes a similar one.
     property string editorFont: "Georgia"
@@ -93,6 +108,8 @@ QtObject {
     property Settings prefs: Settings {
         category: "appearance"
         property alias theme: theme.forced
+        property alias uiFont: theme.uiFont
+        property alias uiFontSize: theme.uiFontSize
         property alias editorFont: theme.editorFont
         property alias editorSize: theme.editorSize
         property alias pageWidth: theme.pageWidth

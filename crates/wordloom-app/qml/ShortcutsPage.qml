@@ -71,7 +71,7 @@ ColumnLayout {
         Layout.fillWidth: true
         wrapMode: Text.Wrap
         color: page.notice ? Theme.text : Theme.subtext
-        font.pixelSize: 12
+        font.pixelSize: Theme.px(12)
         text: page.recording ? qsTr("Press the new keys for %1. Esc cancels; Backspace removes the shortcut.").arg(Shortcuts.command(page.recording).name)
             : page.notice || qsTr("Click a shortcut to change it. Ctrl is ⌘ on macOS.")
     }
@@ -97,14 +97,14 @@ ColumnLayout {
                 text: section
                 font.bold: true
                 color: Theme.subtext
-                font.pixelSize: 11
+                font.pixelSize: Theme.px(11)
             }
             delegate: Item {
                 id: row
                 required property var modelData
                 property alias button: keyButton
                 width: ListView.view.width
-                height: 32
+                height: Theme.px(32)
                 readonly property bool custom: { Shortcuts.customJson; return Shortcuts.isCustom(modelData.id); }
                 RowLayout {
                     anchors.fill: parent
@@ -144,7 +144,7 @@ ColumnLayout {
         Layout.fillWidth: true
         wrapMode: Text.Wrap
         color: Theme.subtext
-        font.pixelSize: 12
+        font.pixelSize: Theme.px(12)
         text: qsTr("These are the menu commands. Keys inside views (the binder's F2 and arrows, F3 in the find bar, Esc) stay as they are.")
     }
 }

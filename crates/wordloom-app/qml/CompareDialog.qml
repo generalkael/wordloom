@@ -60,7 +60,7 @@ Dialog {
                 currentIndex: dlg.leftIndex
                 onActivated: (i) => { dlg.leftIndex = i; dlg.refresh(); }
             }
-            Label { text: "→"; color: Theme.subtext; font.pixelSize: 18 }
+            Label { text: "→"; color: Theme.subtext; font.pixelSize: Theme.px(18) }
             ComboBox {
                 Layout.fillWidth: true
                 model: [qsTr("Current text")].concat(dlg.snaps.map(s => s.title + "  ·  " + new Date(s.created).toLocaleString(Qt.locale(), Locale.ShortFormat)))
@@ -121,7 +121,7 @@ Dialog {
                     wrapMode: Text.Wrap
                     color: row.modelData.kind === "same" ? Theme.subtext : Theme.ink
                     font.family: Theme.editorFont
-                    font.pixelSize: 14
+                    font.pixelSize: Theme.px(14)
                 }
                 Text {
                     id: r
@@ -132,7 +132,7 @@ Dialog {
                     wrapMode: Text.Wrap
                     color: row.modelData.kind === "same" ? Theme.subtext : Theme.ink
                     font.family: Theme.editorFont
-                    font.pixelSize: 14
+                    font.pixelSize: Theme.px(14)
                 }
             }
         }

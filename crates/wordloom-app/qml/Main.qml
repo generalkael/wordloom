@@ -33,6 +33,10 @@ ApplicationWindow {
     color: Theme.window
     title: (Wordloom.projectOpen ? Wordloom.title + (Wordloom.dirty ? " •" : "") + " — " : "") + "Wordloom"
 
+    // Preferences ▸ Interface; controls, dialogs and menus inherit it. (Set
+    // per property: assigning a whole Qt.font() here hangs at startup.)
+    font.family: Theme.uiFont || Theme.systemFont.family
+    font.pointSize: Theme.uiPointSize
     palette.window: Theme.window
     palette.base: Theme.base
     palette.alternateBase: Theme.panel
@@ -149,7 +153,7 @@ ApplicationWindow {
         property string dir: ""
         property bool dark: false
         property int step: 0
-        readonly property var views: ["editor", "multiselect", "favorites", "corkboard", "carddrag", "freeform", "outliner", "styled", "fonts", "complete", "linebar", "repeats", "footnote", "timeline", "lanes", "event", "search", "goto", "compile", "pdf", "stats", "settings", "add", "undo", "split", "file", "compare", "relations", "relation", "names", "history", "sprint", "analysis", "grid", "autobackup", "preferences", "prefseditor", "prefswriting", "prefscorkboard", "prefsshortcuts", "newproject", "reader", "focus", "start"]
+        readonly property var views: ["editor", "multiselect", "favorites", "corkboard", "carddrag", "freeform", "outliner", "styled", "fonts", "complete", "linebar", "repeats", "footnote", "timeline", "lanes", "event", "search", "goto", "compile", "pdf", "stats", "settings", "add", "undo", "split", "file", "compare", "relations", "relation", "names", "history", "sprint", "analysis", "grid", "autobackup", "preferences", "prefsinterface", "prefseditor", "prefswriting", "prefscorkboard", "prefsshortcuts", "newproject", "reader", "focus", "start"]
         interval: 700
         repeat: true
         // Even ticks switch view, odd ticks capture it.
@@ -160,7 +164,7 @@ ApplicationWindow {
                 loader.grabToImage(r => r.saveToFile(file));
                 // Popups render in the window overlay, which can't be grabbed;
                 // capture the dialog's own content instead.
-                const dlg = { event: win.ws ? win.ws.eventDialog() : null, compile: compileDialog, pdf: compileDialog, goto: goTo, stats: statsDialog, settings: settingsDialog, compare: win.ws ? win.ws.compareDialogRef() : null, fonts: prefsDialog, relation: win.ws ? win.ws.relationDialogRef() : null, names: nameDialog, sprint: sprintDialog, analysis: analysisDialog, grid: presenceDialog, autobackup: prefsDialog, preferences: prefsDialog, prefseditor: prefsDialog, prefswriting: prefsDialog, prefscorkboard: prefsDialog, prefsshortcuts: prefsDialog, newproject: newDialog }[v];
+                const dlg = { event: win.ws ? win.ws.eventDialog() : null, compile: compileDialog, pdf: compileDialog, goto: goTo, stats: statsDialog, settings: settingsDialog, compare: win.ws ? win.ws.compareDialogRef() : null, fonts: prefsDialog, relation: win.ws ? win.ws.relationDialogRef() : null, names: nameDialog, sprint: sprintDialog, analysis: analysisDialog, grid: presenceDialog, autobackup: prefsDialog, preferences: prefsDialog, prefsinterface: prefsDialog, prefseditor: prefsDialog, prefswriting: prefsDialog, prefscorkboard: prefsDialog, prefsshortcuts: prefsDialog, newproject: newDialog }[v];
                 if (dlg && dlg.contentChildren.length) dlg.contentChildren[0].grabToImage(r => r.saveToFile(file.replace(".png", "-dialog.png")));
                 if (v === "history") historyWindow.contentItem.grabToImage(r => r.saveToFile(file.replace(".png", "-window.png")));
             } else if (v === undefined) {
@@ -528,7 +532,7 @@ ApplicationWindow {
                 Layout.fillWidth: true
                 wrapMode: Text.Wrap
                 color: Theme.subtext
-                font.pixelSize: 12
+                font.pixelSize: Theme.px(12)
                 text: newDialog.templates.length ? newDialog.templates[Math.max(0, newTemplate.currentIndex)].description : ""
             }
             Label { text: qsTr("Location") }

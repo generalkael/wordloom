@@ -22,7 +22,7 @@ Rectangle {
 
         Label {
             text: "Wordloom"
-            font.pixelSize: 44
+            font.pixelSize: Theme.px(44)
             font.family: Theme.editorFont
             color: Theme.text
             Layout.alignment: Qt.AlignHCenter
@@ -70,7 +70,7 @@ Rectangle {
                     contentItem: ColumnLayout {
                         spacing: 2
                         Label { text: modelData.title; font.bold: true; color: Theme.text }
-                        Label { text: modelData.path; color: Theme.subtext; font.pixelSize: 11; elide: Text.ElideMiddle; Layout.fillWidth: true }
+                        Label { text: modelData.path; color: Theme.subtext; font.pixelSize: Theme.px(11); elide: Text.ElideMiddle; Layout.fillWidth: true }
                     }
                     onClicked: page.recentChosen(modelData.path)
                 }

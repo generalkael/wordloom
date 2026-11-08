@@ -19,6 +19,7 @@ Dialog {
 
     readonly property var pages: [
         { id: "general", name: qsTr("General") },
+        { id: "interface", name: qsTr("Interface") },
         { id: "font", name: qsTr("Font & Spacing") },
         { id: "editor", name: qsTr("Editor") },
         { id: "writing", name: qsTr("Spelling & Typing") },
@@ -35,8 +36,8 @@ Dialog {
     function pageIndex() { return Math.max(0, pages.findIndex(p => p.id === page)); }
 
     onAboutToShow: {
-        fontFilter = "";
-        familyList.positionViewAtIndex(Math.max(0, families.indexOf(Theme.editorFont)), ListView.Center);
+        editorFonts.reset();
+        interfaceFonts.reset();
         spellInfo = Api.call("spellLanguages") || spellInfo;
         scaleInfo = Api.call("uiScale") || scaleInfo;
         loadWords();
@@ -58,13 +59,18 @@ Dialog {
     }
     function folderText(u) { return decodeURIComponent(String(u).replace(/^file:\/\//, "")); }
 
+    // ---- Interface ----
+    readonly property int uiSizeMin: 7
+    readonly property int uiSizeMax: 20
+    // Interface text size in points; the system's own size means "follow the system".
+    function setUiFontSize(pt) {
+        if (!(pt >= uiSizeMin && pt <= uiSizeMax)) return false;
+        Theme.uiFontSize = Math.abs(pt - Theme.systemPointSize) < 0.01 ? 0 : pt;
+        return true;
+    }
+
     // ---- Font & Spacing ----
     readonly property var allFamilies: Qt.fontFamilies()
-    property string fontFilter: ""
-    readonly property var families: {
-        const f = fontFilter.trim().toLowerCase();
-        return f ? allFamilies.filter(n => n.toLowerCase().indexOf(f) >= 0) : allFamilies;
-    }
     readonly property bool installed: allFamilies.indexOf(Theme.editorFont) >= 0
     // A few good writing fonts, shown first when installed.
     readonly property var suggested: ["Georgia", "Libre Baskerville", "Merriweather", "Noto Serif", "DejaVu Serif",
@@ -149,8 +155,85 @@ Dialog {
         onAccepted: pd.autoBackup.folder = selectedFolder.toString()
     }
 
+    // Search and pick a font family. `current` is highlighted; with
+    // `systemLabel` set, a first entry picks the system font ("").
+    component FontPicker: ColumnLayout {
+        id: fp
+        property string current: ""
+        property string systemLabel: ""
+        property var suggestions: []
+        property string filter: ""
+        signal chosen(string name)
+        readonly property var shown: {
+            const f = filter.trim().toLowerCase();
+            const list = f ? pd.allFamilies.filter(n => n.toLowerCase().indexOf(f) >= 0) : pd.allFamilies;
+            return systemLabel && !f ? [""].concat(list) : list;
+        }
+        function reset() {
+            filter = "";
+            familyList.positionViewAtIndex(Math.max(0, shown.indexOf(current)), ListView.Center);
+        }
+        spacing: 4
+        TextField {
+            Layout.fillWidth: true
+            placeholderText: qsTr("Search fonts")
+            selectByMouse: true
+            text: fp.filter
+            onTextEdited: fp.filter = text
+            Keys.onReturnPressed: if (fp.shown.length) fp.chosen(fp.shown[0])
+        }
+        Flow {
+            Layout.fillWidth: true
+            spacing: 4
+            visible: fp.suggestions.length > 0 && fp.filter === ""
+            Repeater {
+                model: fp.suggestions.slice(0, 6)
+                delegate: Button {
+                    required property string modelData
+                    text: modelData
+                    font.family: modelData
+                    flat: fp.current !== modelData
+                    highlighted: fp.current === modelData
+                    onClicked: fp.chosen(modelData)
+                }
+            }
+        }
+        Rectangle {
+            Layout.fillWidth: true
+            Layout.preferredHeight: 180
+            color: Theme.base
+            border.color: Theme.border
+            radius: 3
+            ListView {
+                id: familyList
+                anchors.fill: parent
+                anchors.margins: 1
+                clip: true
+                model: fp.shown
+                ScrollBar.vertical: ScrollBar {}
+                delegate: ItemDelegate {
+                    required property string modelData
+                    width: ListView.view.width
+                    height: Theme.px(28)
+                    clip: true   // some display fonts draw far outside their line
+                    highlighted: modelData === fp.current
+                    contentItem: Label {
+                        text: modelData || fp.systemLabel
+                        font.family: modelData || Theme.systemFont.family
+                        font.pixelSize: Theme.px(14)
+                        elide: Text.ElideRight
+                        color: Theme.text
+                        verticalAlignment: Text.AlignVCenter
+                    }
+                    onClicked: fp.chosen(modelData)
+                }
+            }
+            Label { anchors.centerIn: parent; visible: fp.shown.length === 0; text: qsTr("No fonts match"); color: Theme.subtext }
+        }
+    }
+
     component Heading: Label { font.bold: true; color: Theme.text; Layout.topMargin: 4 }
-    component Note: Label { Layout.fillWidth: true; wrapMode: Text.Wrap; color: Theme.subtext; font.pixelSize: 12 }
+    component Note: Label { Layout.fillWidth: true; wrapMode: Text.Wrap; color: Theme.subtext; font.pixelSize: Theme.px(12) }
 
     RowLayout {
         anchors.fill: parent
@@ -249,6 +332,80 @@ Dialog {
                 }
             }
 
+            // ---------------- Interface ----------------
+            ScrollView {
+                contentWidth: availableWidth
+                ColumnLayout {
+                    width: parent.width
+                    spacing: 10
+                    RowLayout {
+                        Layout.fillWidth: true
+                        spacing: 14
+                        ColumnLayout {
+                            Layout.fillWidth: true
+                            Layout.preferredWidth: 240
+                            spacing: 4
+                            Heading { text: qsTr("Interface font") }
+                            FontPicker {
+                                id: interfaceFonts
+                                Layout.fillWidth: true
+                                current: Theme.uiFont
+                                systemLabel: qsTr("System font (%1)").arg(Theme.systemFont.family)
+                                onChosen: (name) => Theme.uiFont = name
+                            }
+                            Note {
+                                visible: Theme.uiFont !== "" && pd.allFamilies.indexOf(Theme.uiFont) < 0
+                                text: qsTr("“%1” isn't installed, so a similar font is used.").arg(Theme.uiFont)
+                            }
+                        }
+                        GridLayout {
+                            Layout.alignment: Qt.AlignTop
+                            columns: 2
+                            columnSpacing: 8
+                            rowSpacing: 8
+                            Label { text: qsTr("Size"); color: Theme.text }
+                            RowLayout {
+                                SpinBox {
+                                    id: uiSizeBox
+                                    from: pd.uiSizeMin; to: pd.uiSizeMax
+                                    value: Math.round(Theme.uiPointSize)
+                                    editable: true
+                                    onValueModified: pd.setUiFontSize(value)
+                                }
+                                Label { text: qsTr("pt"); color: Theme.subtext }
+                            }
+                            Item { Layout.columnSpan: 2; Layout.preferredHeight: 4 }
+                            Button {
+                                Layout.columnSpan: 2
+                                text: qsTr("Use the System Font")
+                                enabled: Theme.uiFont !== "" || Theme.uiFontSize > 0
+                                onClicked: Theme.resetUiFont()
+                            }
+                        }
+                    }
+                    Heading { text: qsTr("Preview") }
+                    Rectangle {
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: previewCol.implicitHeight + 20
+                        color: Theme.panel
+                        border.color: Theme.border
+                        radius: 3
+                        ColumnLayout {
+                            id: previewCol
+                            anchors.fill: parent
+                            anchors.margins: 10
+                            spacing: 4
+                            Label { text: qsTr("Chapter One ▸ The Storm"); color: Theme.text; font.bold: true }
+                            Label { text: qsTr("Binder, cards, the outliner, menus and dialogs use this font."); color: Theme.text; Layout.fillWidth: true; wrapMode: Text.Wrap }
+                            Label { text: qsTr("1,204 words · First draft"); color: Theme.subtext; font.pixelSize: Theme.px(11) }
+                        }
+                    }
+                    Note {
+                        text: qsTr("Sizes throughout Wordloom follow this one: headings, captions and list rows grow and shrink with it. The editor has its own font, in Font & Spacing. Interface size, under General, scales everything, including the editor and the icons.")
+                    }
+                }
+            }
+
             // ---------------- Font & Spacing ----------------
             ScrollView {
                 contentWidth: availableWidth
@@ -263,54 +420,12 @@ Dialog {
                             Layout.preferredWidth: 240
                             spacing: 4
                             Heading { text: qsTr("Font") }
-                            TextField {
+                            FontPicker {
+                                id: editorFonts
                                 Layout.fillWidth: true
-                                placeholderText: qsTr("Search fonts")
-                                selectByMouse: true
-                                text: pd.fontFilter
-                                onTextEdited: pd.fontFilter = text
-                                Keys.onReturnPressed: if (pd.families.length) pd.chooseFont(pd.families[0])
-                            }
-                            Flow {
-                                Layout.fillWidth: true
-                                spacing: 4
-                                visible: pd.suggested.length > 0 && pd.fontFilter === ""
-                                Repeater {
-                                    model: pd.suggested.slice(0, 6)
-                                    delegate: Button {
-                                        required property string modelData
-                                        text: modelData
-                                        font.family: modelData
-                                        flat: Theme.editorFont !== modelData
-                                        highlighted: Theme.editorFont === modelData
-                                        onClicked: pd.chooseFont(modelData)
-                                    }
-                                }
-                            }
-                            Rectangle {
-                                Layout.fillWidth: true
-                                Layout.preferredHeight: 180
-                                color: Theme.base
-                                border.color: Theme.border
-                                radius: 3
-                                ListView {
-                                    id: familyList
-                                    anchors.fill: parent
-                                    anchors.margins: 1
-                                    clip: true
-                                    model: pd.families
-                                    ScrollBar.vertical: ScrollBar {}
-                                    delegate: ItemDelegate {
-                                        required property string modelData
-                                        width: ListView.view.width
-                                        height: 28
-                                        clip: true   // some display fonts draw far outside their line
-                                        highlighted: modelData === Theme.editorFont
-                                        contentItem: Label { text: modelData; font.family: modelData; font.pixelSize: 14; elide: Text.ElideRight; color: Theme.text; verticalAlignment: Text.AlignVCenter }
-                                        onClicked: pd.chooseFont(modelData)
-                                    }
-                                }
-                                Label { anchors.centerIn: parent; visible: pd.families.length === 0; text: qsTr("No fonts match"); color: Theme.subtext }
+                                current: Theme.editorFont
+                                suggestions: pd.suggested
+                                onChosen: (name) => pd.chooseFont(name)
                             }
                             Note {
                                 visible: !pd.installed
@@ -537,7 +652,7 @@ Dialog {
                             delegate: ItemDelegate {
                                 required property string modelData
                                 width: ListView.view.width
-                                height: 28
+                                height: Theme.px(28)
                                 contentItem: RowLayout {
                                     Label { Layout.fillWidth: true; text: modelData; color: Theme.text; elide: Text.ElideRight }
                                     ToolButton {

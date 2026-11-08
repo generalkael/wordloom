@@ -69,9 +69,9 @@ Dialog {
                     required property var modelData
                     Layout.alignment: Qt.AlignTop
                     spacing: 0
-                    Label { text: modelData[0]; color: Theme.subtext; font.pixelSize: 11 }
-                    Label { text: modelData[1]; font.pixelSize: 20; color: Theme.text }
-                    Label { visible: modelData[2] !== ""; text: modelData[2]; color: Theme.subtext; font.pixelSize: 11 }
+                    Label { text: modelData[0]; color: Theme.subtext; font.pixelSize: Theme.px(11) }
+                    Label { text: modelData[1]; font.pixelSize: Theme.px(20); color: Theme.text }
+                    Label { visible: modelData[2] !== ""; text: modelData[2]; color: Theme.subtext; font.pixelSize: Theme.px(11) }
                 }
             }
         }
@@ -104,7 +104,7 @@ Dialog {
                     ToolTip.text: qsTr("Open “%1” at this sentence").arg(modelData.title)
                     contentItem: ColumnLayout {
                         spacing: 1
-                        Label { text: qsTr("%1 words · %2").arg(modelData.words).arg(modelData.title); color: Theme.subtext; font.pixelSize: 11 }
+                        Label { text: qsTr("%1 words · %2").arg(modelData.words).arg(modelData.title); color: Theme.subtext; font.pixelSize: Theme.px(11) }
                         Label { text: modelData.text; textFormat: Text.PlainText; color: Theme.text; wrapMode: Text.Wrap; Layout.fillWidth: true }
                     }
                 }
@@ -121,7 +121,7 @@ Dialog {
             Layout.fillWidth: true
             text: qsTr("Click a word or phrase to find it in the project. Common words (the, and, said…) are left out, and comments aren't counted.")
             color: Theme.subtext
-            font.pixelSize: 11
+            font.pixelSize: Theme.px(11)
             wrapMode: Text.Wrap
         }
     }
@@ -139,7 +139,7 @@ Dialog {
             required property var modelData
             required property int index
             width: ListView.view.width
-            height: 28
+            height: Theme.px(28)
             onClicked: ad.searchRequested(modelData.text)
             contentItem: RowLayout {
                 spacing: 8

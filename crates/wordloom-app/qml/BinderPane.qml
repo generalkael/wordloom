@@ -113,7 +113,7 @@ Rectangle {
             visible: pane.favorites.length > 0 && searchField.text.trim().length === 0
             Item {
                 width: favBox.width
-                height: 24
+                height: Theme.px(24)
                 Label {
                     anchors.left: parent.left
                     anchors.leftMargin: 10
@@ -138,7 +138,7 @@ Rectangle {
                     id: fav
                     required property var modelData
                     width: favBox.width
-                    height: 26
+                    height: Theme.px(26)
                     Rectangle {
                         anchors.fill: parent
                         anchors.leftMargin: 4
@@ -213,7 +213,7 @@ Rectangle {
                 required property var modelData
                 required property int index
                 width: ListView.view.width
-                height: 28
+                height: Theme.px(28)
                 readonly property bool isCurrent: modelData.id === pane.currentId
                 readonly property bool isPicked: pane.pickCount > 0 && !!pane.picked[modelData.id]
                 readonly property bool isRoot: modelData.role !== null && modelData.role !== undefined
@@ -276,7 +276,7 @@ Rectangle {
                         visible: row.modelData.favorite && pane.renamingId !== row.modelData.id
                         text: "★"
                         color: Theme.accent
-                        font.pixelSize: 11
+                        font.pixelSize: Theme.px(11)
                     }
                     // Progress toward this item's word target.
                     Rectangle {

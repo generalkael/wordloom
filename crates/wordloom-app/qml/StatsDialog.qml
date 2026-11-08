@@ -47,8 +47,8 @@ Dialog {
                 delegate: ColumnLayout {
                     required property var modelData
                     spacing: 0
-                    Label { text: modelData[0]; color: Theme.subtext; font.pixelSize: 11 }
-                    Label { text: modelData[1]; font.pixelSize: 20; color: Theme.text }
+                    Label { text: modelData[0]; color: Theme.subtext; font.pixelSize: Theme.px(11) }
+                    Label { text: modelData[1]; font.pixelSize: Theme.px(20); color: Theme.text }
                 }
             }
         }

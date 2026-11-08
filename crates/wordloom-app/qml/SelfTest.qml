@@ -15,6 +15,7 @@ Item {
     property string noteId: ""          // the note resized (note resize)
     property var replaceBefore: []        // texts before a project replace
     property var groupStart: null        // spots before a group drag (freeform groups)
+    property var noteAdded: null         // revision and editor right after + Note (freeform corkboard)
     property var goTo                    // GoToPopup
     property var autoBackup              // Main.qml's automatic backups
     property var prefs                   // PreferencesDialog
@@ -195,6 +196,20 @@ Item {
             prefs.openAt("nonsense");
             check(prefs.page === "writing", "an unknown page leaves the page as it was");
             prefs.close();
+        }],
+        ["interface font", () => {
+            Theme.resetUiFont();
+            check(win.font.family === Theme.systemFont.family && Math.abs(win.font.pointSize - Theme.systemPointSize) < 0.01 && Theme.px(11) === 11,
+                "the interface follows the system font by default (" + win.font.family + " " + win.font.pointSize + ")");
+            const fam = Qt.fontFamilies().find(f => f !== Theme.systemFont.family);
+            Theme.uiFont = fam;
+            check(win.font.family === fam && prefs.font.family === fam && history.font.family === fam, "a chosen interface font reaches the window, dialogs and the history window (" + fam + ")");
+            const pt = Math.min(prefs.uiSizeMax, Math.round(Theme.systemPointSize) + 4);
+            check(prefs.setUiFontSize(pt) && win.font.pointSize === pt && prefs.font.pointSize === pt, "the interface size can be set in points (" + pt + ")");
+            check(Theme.px(11) > 11 && Theme.px(28) > 28, "fixed sizes and row heights grow with it (" + Theme.px(11) + ", " + Theme.px(28) + ")");
+            check(!prefs.setUiFontSize(99) && win.font.pointSize === pt, "a size out of range is refused");
+            Theme.resetUiFont();
+            check(win.font.family === Theme.systemFont.family && Theme.uiFontSize === 0 && Theme.px(11) === 11, "Use the System Font goes back to the system's");
         }],
         ["indent and blank lines", () => {
             const a = ed().firstArea();
@@ -561,13 +576,20 @@ Item {
             Api.call("undo");
             check(Api.call("undo") === "Move on Corkboard" && c.board.positions[rowId("Arrival")] === undefined, "Undo takes the move back");
             check(c.freeform, "and leaves the board freeform");
-            c.addNote(null);
+            const id = c.addNote(null);
+            // What the check below compares with, if focus is missing on CI.
+            st.noteAdded = { rev: Wordloom.revision, editor: c.noteEditor(id) };
+            Qt.callLater(() => { if (st.noteAdded) st.noteAdded.focused = !!(c.noteEditor(id) && c.noteEditor(id).activeFocus); });
         }],
         ["freeform corkboard", () => {
             const c = ws().corkboardRef(), notes = c.board.notes;
             check(notes.length === 1 && c.items.length === c.cards.length + 1, "+ Note puts a note on the board, not in the binder");
             const ta = c.noteEditor(notes[0].id);
-            check(ta !== null && ta.activeFocus, "the new note is ready to type in (" + (ta ? "focus " + ta.activeFocus : "no editor") + ")");
+            const a = st.noteAdded || {}, fi = win.activeFocusItem;
+            check(ta !== null && ta.activeFocus, "the new note is ready to type in (" + (ta ? "focus " + ta.activeFocus : "no editor")
+                + (ta && ta.activeFocus ? "" : "; same editor " + (ta === a.editor) + ", focused after callLater " + a.focused
+                    + ", revision +" + (Wordloom.revision - a.rev) + ", focus on " + (fi ? fi + (fi.parent ? " in " + fi.parent : "") : "nothing")
+                    + ", window active " + win.active) + ")");
             if (ta) { ta.insert(0, "Storm rips the lamp glass"); c.focusBoard(); }
         }],
         ["freeform corkboard", () => {

@@ -22,7 +22,7 @@ Dialog {
     signal mentionRequested(string docId, string name)
 
     readonly property int maxCount: grid.rows.reduce((m, r) => Math.max(m, ...r.counts, 0), 0)
-    readonly property int cell: 34
+    readonly property int cell: Theme.px(34)
     readonly property int nameWidth: 170
 
     onAboutToShow: reload()
@@ -128,7 +128,7 @@ Dialog {
                                     anchors.centerIn: parent
                                     visible: modelData > 0
                                     text: modelData
-                                    font.pixelSize: 11
+                                    font.pixelSize: Theme.px(11)
                                     color: pd.shade(modelData) > 0.6 ? "white" : Theme.text
                                 }
                                 HoverHandler {

@@ -23,9 +23,9 @@ Rectangle {
     property string selectedEvent: ""
     signal openScene(string id)
 
-    readonly property int rowH: 44
+    readonly property int rowH: Theme.px(44)
     readonly property int headerW: 210
-    readonly property int rulerH: 42
+    readonly property int rulerH: Theme.px(42)
     readonly property int pad: 4
     readonly property real minScale: 0.05
 
@@ -53,7 +53,7 @@ Rectangle {
     property bool lanes: false
     Settings { category: "timeline"; property alias lanes: gv.lanes }
     property var collapsed: ({})
-    readonly property int laneH: 26
+    readonly property int laneH: Theme.px(26)
     readonly property var laneKinds: [
         { kind: "character", label: qsTr("Characters") },
         { kind: "place", label: qsTr("Places") },
@@ -307,7 +307,7 @@ Rectangle {
                                     x: 3; y: 6
                                     text: Api.unitLabel(gv.tl, parent.unit)
                                     color: Theme.subtext
-                                    font.pixelSize: 11
+                                    font.pixelSize: Theme.px(11)
                                 }
                             }
                         }
@@ -320,7 +320,7 @@ Rectangle {
                                 text: "⚑ " + modelData.title
                                 color: modelData.color
                                 font.bold: true
-                                font.pixelSize: 11
+                                font.pixelSize: Theme.px(11)
                                 TapHandler { acceptedButtons: Qt.RightButton; onTapped: markerMenu.popup() }
                                 Menu { id: markerMenu; MenuItem { text: qsTr("Remove marker"); onTriggered: Api.call("removeMarker", modelData.id) } }
                             }
@@ -473,7 +473,7 @@ Rectangle {
                                 anchors.verticalCenter: parent.verticalCenter
                                 text: (bar.ev.linked_nodes.length ? "✎ " : "") + bar.ev.title
                                 color: bar.ghost || outside ? Theme.text : "white"
-                                font.pixelSize: 12
+                                font.pixelSize: Theme.px(12)
                                 font.italic: bar.ghost
                                 visible: !(bar.ghost && outside)
                             }
@@ -550,7 +550,7 @@ Rectangle {
                     visible: gv.tl !== null && gv.tl.tracks.length === 0
                     spacing: 10
                     z: 5
-                    Label { text: qsTr("Plot your story in time"); font.pixelSize: 20; color: Theme.text; Layout.alignment: Qt.AlignHCenter }
+                    Label { text: qsTr("Plot your story in time"); font.pixelSize: Theme.px(20); color: Theme.text; Layout.alignment: Qt.AlignHCenter }
                     Label {
                         text: qsTr("Tracks are rows — a character, a plotline, a place.\nEvents are bars on the story clock. Link them to scenes,\nchain them with dependencies, and spot conflicts instantly.")
                         horizontalAlignment: Text.AlignHCenter
@@ -578,7 +578,7 @@ Rectangle {
                     Label { text: qsTr("Story order vs. manuscript order"); font.bold: true; color: Theme.text; wrapMode: Text.Wrap; Layout.fillWidth: true }
                     Label {
                         text: qsTr("Scenes linked to events, in the order they happen. # is the position in the manuscript; ↺ marks scenes told out of sequence.")
-                        color: Theme.subtext; font.pixelSize: 11; wrapMode: Text.Wrap; Layout.fillWidth: true
+                        color: Theme.subtext; font.pixelSize: Theme.px(11); wrapMode: Text.Wrap; Layout.fillWidth: true
                     }
                     ListView {
                         Layout.fillWidth: true
@@ -596,7 +596,7 @@ Rectangle {
                                 Label { text: "#" + msIndex; color: Theme.subtext; Layout.preferredWidth: 34 }
                                 Label { text: modelData.title; color: Theme.text; elide: Text.ElideRight; Layout.fillWidth: true }
                                 Label { visible: msIndex < prevMs; text: "↺"; color: Theme.accent; font.bold: true }
-                                Label { text: Api.unitLabel(gv.tl, modelData.at); color: Theme.subtext; font.pixelSize: 10 }
+                                Label { text: Api.unitLabel(gv.tl, modelData.at); color: Theme.subtext; font.pixelSize: Theme.px(10) }
                             }
                         }
                     }
@@ -638,7 +638,7 @@ Rectangle {
             ColumnLayout {
                 id: problemsCol
                 width: 420
-                Label { text: qsTr("Scheduling conflicts"); font.bold: true; font.pixelSize: 16; color: Theme.text }
+                Label { text: qsTr("Scheduling conflicts"); font.bold: true; font.pixelSize: Theme.px(16); color: Theme.text }
                 Repeater {
                     model: gv.tl ? gv.tl.problems : []
                     delegate: Label {
@@ -668,7 +668,7 @@ Rectangle {
         padding: 16
         onAboutToShow: { unitField.text = gv.tl ? gv.tl.unit_name : "Day"; calField.text = gv.tl && gv.tl.calendar_start ? gv.tl.calendar_start : ""; }
         ColumnLayout {
-            Label { text: qsTr("Timeline settings"); font.bold: true; font.pixelSize: 16; color: Theme.text }
+            Label { text: qsTr("Timeline settings"); font.bold: true; font.pixelSize: Theme.px(16); color: Theme.text }
             GridLayout {
                 columns: 2
                 Label { text: qsTr("Unit name") }
@@ -676,7 +676,7 @@ Rectangle {
                 Label { text: qsTr("Day 0 is (YYYY-MM-DD)") }
                 TextField { id: calField; placeholderText: qsTr("optional, for date labels") }
             }
-            Label { text: qsTr("With a start date and a unit of “Day”, the ruler shows calendar dates."); color: Theme.subtext; font.pixelSize: 11 }
+            Label { text: qsTr("With a start date and a unit of “Day”, the ruler shows calendar dates."); color: Theme.subtext; font.pixelSize: Theme.px(11) }
             RowLayout {
                 Layout.alignment: Qt.AlignRight
                 Button { text: qsTr("Cancel"); onClicked: settingsPopup.close() }

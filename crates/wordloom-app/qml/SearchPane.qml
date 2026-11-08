@@ -102,7 +102,7 @@ ColumnLayout {
         Item { Layout.fillWidth: true }
         Label {
             color: Theme.subtext
-            font.pixelSize: 12
+            font.pixelSize: Theme.px(12)
             text: sp.hits.length ? qsTr("%1 result(s)").arg(sp.hits.length) : qsTr("No matches")
         }
     }
@@ -166,7 +166,7 @@ ColumnLayout {
                     spacing: 1
                     RowLayout {
                         Label { text: hitRow.modelData.title; font.bold: true; color: Theme.text; elide: Text.ElideRight; Layout.fillWidth: true }
-                        Label { text: hitRow.modelData.field + (hitRow.modelData.count > 1 ? " ×" + hitRow.modelData.count : ""); color: Theme.accent; font.pixelSize: 11 }
+                        Label { text: hitRow.modelData.field + (hitRow.modelData.count > 1 ? " ×" + hitRow.modelData.count : ""); color: Theme.accent; font.pixelSize: Theme.px(11) }
                     }
                     Label {
                         text: sp.marked(hitRow.modelData.snippet)
@@ -176,7 +176,7 @@ ColumnLayout {
                         maximumLineCount: 2
                         elide: Text.ElideRight
                         Layout.fillWidth: true
-                        font.pixelSize: 12
+                        font.pixelSize: Theme.px(12)
                     }
                 }
             }

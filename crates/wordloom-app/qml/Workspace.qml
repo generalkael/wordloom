@@ -344,11 +344,11 @@ Item {
                 anchors.fill: parent
                 spacing: 4
                 ToolButton {
-                    text: "←"; font.pixelSize: 16; enabled: ws.canGoBack; onClicked: ws.goBack()
+                    text: "←"; font.pixelSize: Theme.px(16); enabled: ws.canGoBack; onClicked: ws.goBack()
                     ToolTip.visible: hovered; ToolTip.text: qsTr("Back (Alt+←)")
                 }
                 ToolButton {
-                    text: "→"; font.pixelSize: 16; enabled: ws.canGoForward; onClicked: ws.goForward()
+                    text: "→"; font.pixelSize: Theme.px(16); enabled: ws.canGoForward; onClicked: ws.goForward()
                     ToolTip.visible: hovered; ToolTip.text: qsTr("Forward (Alt+→)")
                 }
                 ToolSeparator {}
@@ -356,11 +356,11 @@ Item {
                 ToolButton { text: "+ " + qsTr("Folder"); onClicked: ws.addItem("folder") }
                 ToolSeparator {}
                 ToolButton {
-                    text: "↶"; font.pixelSize: 18; enabled: Wordloom.undoText !== ""; onClicked: ws.undo()
+                    text: "↶"; font.pixelSize: Theme.px(18); enabled: Wordloom.undoText !== ""; onClicked: ws.undo()
                     ToolTip.visible: hovered; ToolTip.text: enabled ? qsTr("Undo %1").arg(Wordloom.undoText) : qsTr("Nothing to undo")
                 }
                 ToolButton {
-                    text: "↷"; font.pixelSize: 18; enabled: Wordloom.redoText !== ""; onClicked: ws.redo()
+                    text: "↷"; font.pixelSize: Theme.px(18); enabled: Wordloom.redoText !== ""; onClicked: ws.redo()
                     ToolTip.visible: hovered; ToolTip.text: enabled ? qsTr("Redo %1").arg(Wordloom.redoText) : qsTr("Nothing to redo")
                 }
                 ToolSeparator {}

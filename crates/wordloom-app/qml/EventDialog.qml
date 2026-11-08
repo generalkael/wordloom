@@ -87,7 +87,7 @@ Dialog {
                 Label {
                     Layout.columnSpan: 3
                     color: Theme.subtext
-                    font.pixelSize: 11
+                    font.pixelSize: Theme.px(11)
                     text: dlg.tl ? Api.unitLabel(dlg.tl, startBox.value) + (durBox.value > 0 ? "  →  " + Api.unitLabel(dlg.tl, startBox.value + durBox.value) : qsTr("  (length 0 = milestone)")) : ""
                 }
                 Label { text: qsTr("Colour") }

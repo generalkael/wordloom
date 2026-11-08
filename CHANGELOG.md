@@ -5,6 +5,10 @@ Notable changes to Wordloom. Each entry lands in the same commit as the change i
 ## Unreleased
 
 ### Added
+- **Interface font and size.** Preferences ▸ Interface picks the font for menus, panels, dialogs,
+  the binder, cards and lists, and its size in points (7 to 20). Headings, captions and list rows
+  grow and shrink with it, and it applies at once. *Use the System Font* goes back to the
+  system's. The editor keeps its own font (Font & Spacing).
 - **Custom keyboard shortcuts.** Preferences ▸ Keyboard Shortcuts lists every menu command with its
   keys. Click one and press new keys; a command that had them loses them. ↺ and *Reset All* go back
   to the defaults.

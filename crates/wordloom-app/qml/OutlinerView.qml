@@ -188,13 +188,13 @@ Rectangle {
                     currentIndex: Math.max(0, ids.indexOf(ov.filterStatus))
                     onActivated: (i) => ov.filterStatus = ids[i]
                 }
-                ToolButton { text: "✕"; visible: ov.filtering; font.pixelSize: 12; onClicked: ov.clearFilter(); ToolTip.visible: hovered; ToolTip.text: qsTr("Clear the filter (Esc)") }
+                ToolButton { text: "✕"; visible: ov.filtering; font.pixelSize: Theme.px(12); onClicked: ov.clearFilter(); ToolTip.visible: hovered; ToolTip.text: qsTr("Clear the filter (Esc)") }
                 Item { Layout.fillWidth: true }
-                ToolButton { text: qsTr("Collapse All"); enabled: !ov.filtering; font.pixelSize: 12; onClicked: ov.setAllCollapsed(true) }
-                ToolButton { text: qsTr("Expand All"); enabled: !ov.filtering; font.pixelSize: 12; onClicked: ov.setAllCollapsed(false) }
+                ToolButton { text: qsTr("Collapse All"); enabled: !ov.filtering; font.pixelSize: Theme.px(12); onClicked: ov.setAllCollapsed(true) }
+                ToolButton { text: qsTr("Expand All"); enabled: !ov.filtering; font.pixelSize: Theme.px(12); onClicked: ov.setAllCollapsed(false) }
                 ToolButton {
                     text: qsTr("Columns ▾")
-                    font.pixelSize: 12
+                    font.pixelSize: Theme.px(12)
                     onClicked: columnMenu.popup()
                     ToolTip.visible: hovered
                     ToolTip.text: qsTr("Show keywords or custom fields (POV, Setting, …) as columns")
@@ -236,7 +236,7 @@ Rectangle {
             header: Rectangle {
                 z: 3
                 width: ov.tableWidth
-                height: 30
+                height: Theme.px(30)
                 color: Theme.panel
                 RowLayout {
                     anchors.fill: parent
@@ -359,7 +359,7 @@ Rectangle {
             Layout.bottomMargin: 4
             elide: Text.ElideRight
             color: Theme.subtext
-            font.pixelSize: 12
+            font.pixelSize: Theme.px(12)
             text: ov.filtering
                 ? qsTr("%1 of %2 items match · %3 words in them").arg(ov.matchCount).arg(ov.allRows.length).arg(Api.fmtNumber(ov.matchWords))
                 : (ov.allRows.length === 1 ? qsTr("1 item") : qsTr("%1 items").arg(ov.allRows.length)) + " · " + qsTr("%1 words").arg(Api.fmtNumber(ov.allRows.filter(x => x.depth === 0).reduce((t, x) => t + x.total_words, 0)))
