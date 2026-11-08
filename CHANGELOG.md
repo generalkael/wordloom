@@ -5,6 +5,11 @@ Notable changes to Wordloom. Each entry lands in the same commit as the change i
 ## Unreleased
 
 ### Added
+- **Preferences.** Edit ▸ Preferences… (Ctrl+,) gathers the app-wide settings on six pages:
+  General, Font & Spacing, Editor, Spelling & Typing, Corkboard and Backups. New there: reopen the
+  last project at startup, how often to autosave (5 seconds to 5 minutes), the folder New Project
+  suggests (it now starts filled in, with Documents/Wordloom), and **your dictionary**, which
+  lists the words you've added and can find, add and remove them.
 - **Freeform corkboards.** Switch a board from *Grid* to *Freeform* and cards stay wherever you
   drop them, without changing the binder. *Arrange ▾* ▸ *Tidy Up* puts them back in slots and
   *Order Binder by Board* reorders the folder to match the board (rows, left to right). Ctrl+arrows
@@ -221,6 +226,11 @@ Notable changes to Wordloom. Each entry lands in the same commit as the change i
   start screen and New Document once a project is open.
 
 ### Changed
+- Settings moved into Preferences: Appearance, Line Highlight Colour, Spelling Language, Complete
+  Names and Smart Punctuation (from the View menu), Automatic Backups (from the File menu) and the
+  Editor Font & Spacing dialog (now its Font & Spacing page; *Aa* and View ▸ Editor Font & Spacing…
+  open it). The View menu keeps the quick switches: Check Spelling, Styled Markdown and the
+  highlights.
 - The editor now uses the line spacing (it was only used by the preview), and headings are sized
   from the text (1.6×, 1.35×, 1.15×) so they follow font size and zoom. View ▸ Larger / Smaller
   Text became View ▸ Zoom; the A− / A+ buttons became *Aa* and the zoom button.

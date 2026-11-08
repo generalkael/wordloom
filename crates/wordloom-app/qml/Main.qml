@@ -25,9 +25,9 @@ ApplicationWindow {
     Settings {
         category: "backup"
         property alias folder: backupDialog.lastFolder
-        property alias autoOnClose: autoBackupDialog.closeBackups
-        property alias autoFolder: autoBackupDialog.folder
-        property alias autoKeep: autoBackupDialog.keep
+        property alias autoOnClose: autoBackup.closeBackups
+        property alias autoFolder: autoBackup.folder
+        property alias autoKeep: autoBackup.keep
     }
     visible: true
     color: Theme.window
@@ -54,7 +54,7 @@ ApplicationWindow {
     function newProject() { newDialog.open(); }
     function openProject() { openDialog.open(); }
     function openPath(path) {
-        if (Wordloom.projectOpen) { autoBackupDialog.beforeClose(); Api.call("close"); }
+        if (Wordloom.projectOpen) { autoBackup.beforeClose(); Api.call("close"); }
         if (Api.call("openProject", path) !== undefined) return;
         if (Api.lastErrorKind === "damaged") restoreDialog.offer(path);
         else if (Api.lastErrorKind === "locked") lockedDialog.offer(path);
@@ -64,7 +64,7 @@ ApplicationWindow {
         if (ws) ws.flush();
         if (Api.call("save") !== undefined) Api.say("Saved");
     }
-    // View ▸ Spelling Language: switch dictionaries ("" = the system's) and
+    // Preferences ▸ Spelling & Typing ▸ Language: switch dictionaries ("" = the system's) and
     // redraw the underlines.
     function setSpellLanguage(code) {
         Theme.spellLanguage = code;
@@ -73,9 +73,11 @@ ApplicationWindow {
         if (r) Api.say(qsTr("Spelling: %1").arg(r.dictionary));
         return r;
     }
+    // The autosave period in milliseconds (self-test).
+    function autosaveMs() { return autosaveTimer.interval; }
     function closeProject() {
         if (ws) ws.flush();
-        autoBackupDialog.beforeClose();
+        autoBackup.beforeClose();
         Api.call("close");
     }
 
@@ -94,6 +96,12 @@ ApplicationWindow {
         // --dark only applies to the tour (whose settings are kept apart).
         if (shotTour.dir) { Theme.forced = shotTour.dark ? "dark" : ""; shotTour.start(); }
         if (selfTest.pending) Qt.callLater(selfTest.start);
+        // Preferences ▸ General ▸ Reopen the last project (not for the
+        // tour, the self-test, or when a project is named on the command line).
+        else if (Theme.reopenLast && args.length === 0 && !Wordloom.projectOpen) {
+            const last = (Api.call("recent") || [])[0];
+            if (last) win.openPath(last.path);
+        }
     }
 
     // Developer aid: `wordloom --bench=DIR` builds a novel-sized project in
@@ -133,7 +141,7 @@ ApplicationWindow {
             steps[step][1]();
         }
     }
-    SelfTest { id: selfTest; property bool pending: false; win: win; history: historyWindow; sprint: sprintDialog; analysis: analysisDialog; compile: compileDialog; goTo: goTo; autoBackup: autoBackupDialog; grid: presenceDialog }
+    SelfTest { id: selfTest; property bool pending: false; win: win; history: historyWindow; sprint: sprintDialog; analysis: analysisDialog; compile: compileDialog; goTo: goTo; autoBackup: autoBackup; prefs: prefsDialog; grid: presenceDialog }
 
     // Developer aid: visit every view, save a PNG of each, then quit.
     Timer {
@@ -141,7 +149,7 @@ ApplicationWindow {
         property string dir: ""
         property bool dark: false
         property int step: 0
-        readonly property var views: ["editor", "multiselect", "favorites", "corkboard", "carddrag", "freeform", "outliner", "styled", "fonts", "complete", "linebar", "repeats", "footnote", "timeline", "lanes", "event", "search", "goto", "compile", "pdf", "stats", "settings", "add", "undo", "split", "file", "compare", "relations", "relation", "names", "history", "sprint", "analysis", "grid", "autobackup", "newproject", "reader", "focus", "start"]
+        readonly property var views: ["editor", "multiselect", "favorites", "corkboard", "carddrag", "freeform", "outliner", "styled", "fonts", "complete", "linebar", "repeats", "footnote", "timeline", "lanes", "event", "search", "goto", "compile", "pdf", "stats", "settings", "add", "undo", "split", "file", "compare", "relations", "relation", "names", "history", "sprint", "analysis", "grid", "autobackup", "preferences", "prefseditor", "prefswriting", "prefscorkboard", "newproject", "reader", "focus", "start"]
         interval: 700
         repeat: true
         // Even ticks switch view, odd ticks capture it.
@@ -152,13 +160,13 @@ ApplicationWindow {
                 loader.grabToImage(r => r.saveToFile(file));
                 // Popups render in the window overlay, which can't be grabbed;
                 // capture the dialog's own content instead.
-                const dlg = { event: win.ws ? win.ws.eventDialog() : null, compile: compileDialog, pdf: compileDialog, goto: goTo, stats: statsDialog, settings: settingsDialog, compare: win.ws ? win.ws.compareDialogRef() : null, fonts: win.ws ? win.ws.textSettingsRef() : null, relation: win.ws ? win.ws.relationDialogRef() : null, names: nameDialog, sprint: sprintDialog, analysis: analysisDialog, grid: presenceDialog, autobackup: autoBackupDialog, newproject: newDialog }[v];
+                const dlg = { event: win.ws ? win.ws.eventDialog() : null, compile: compileDialog, pdf: compileDialog, goto: goTo, stats: statsDialog, settings: settingsDialog, compare: win.ws ? win.ws.compareDialogRef() : null, fonts: prefsDialog, relation: win.ws ? win.ws.relationDialogRef() : null, names: nameDialog, sprint: sprintDialog, analysis: analysisDialog, grid: presenceDialog, autobackup: prefsDialog, preferences: prefsDialog, prefseditor: prefsDialog, prefswriting: prefsDialog, prefscorkboard: prefsDialog, newproject: newDialog }[v];
                 if (dlg && dlg.contentChildren.length) dlg.contentChildren[0].grabToImage(r => r.saveToFile(file.replace(".png", "-dialog.png")));
                 if (v === "history") historyWindow.contentItem.grabToImage(r => r.saveToFile(file.replace(".png", "-window.png")));
             } else if (v === undefined) {
                 stop(); Qt.quit(); return;
             } else if (win.ws) {
-                compileDialog.close(); statsDialog.close(); settingsDialog.close(); nameDialog.close(); historyWindow.close(); sprintDialog.close(); analysisDialog.close(); presenceDialog.close(); autoBackupDialog.close(); newDialog.close(); goTo.close(); win.ws.closePopups();
+                compileDialog.close(); statsDialog.close(); settingsDialog.close(); nameDialog.close(); historyWindow.close(); sprintDialog.close(); analysisDialog.close(); presenceDialog.close(); prefsDialog.close(); newDialog.close(); goTo.close(); win.ws.closePopups();
                 win.ws.searchFor(v === "search" ? "lighthouse" : "");
                 { const c = win.ws.corkboardRef(); c.dragId = ""; c.dropIndex = -1; c.dropMode = ""; }
                 win.ws.focusMode = v === "focus";
@@ -179,7 +187,9 @@ ApplicationWindow {
                 else if (v === "sprint") sprintDialog.open();
                 else if (v === "analysis") analysisDialog.open();
                 else if (v === "grid") presenceDialog.open();
-                else if (v === "autobackup") autoBackupDialog.open();
+                else if (v === "autobackup") prefsDialog.openAt("backups");
+                else if (v === "preferences") prefsDialog.openAt("general");
+                else if (v.startsWith("prefs")) prefsDialog.openAt(v.substring(5));
                 else if (v === "newproject") { newDialog.open(); newTemplate.currentIndex = 1; }
                 else if (v === "reader") win.ws.viewMode = "reader";
                 else if (v === "stats") statsDialog.open();
@@ -243,7 +253,7 @@ ApplicationWindow {
                 else if (v === "fonts") {
                     const row = Api.get("binder", []).find(r => r.title === "Arrival");
                     if (row) win.ws.select(row.id, "editor");
-                    win.ws.openTextSettings();
+                    prefsDialog.openAt("font");
                 }
                 else if (v === "carddrag") {
                     win.ws.select(Api.get("binder", []).find(r => r.title === "The Storm").id, "corkboard");
@@ -277,7 +287,7 @@ ApplicationWindow {
         if (Wordloom.projectOpen) {
             if (ws) ws.flush();
             Api.call("save");
-            autoBackupDialog.beforeClose();
+            autoBackup.beforeClose();
         }
     }
 
@@ -290,9 +300,11 @@ ApplicationWindow {
         onTriggered: Api.call("touchLock")
     }
 
-    // Autosave a couple of seconds after the user pauses, and periodically.
+    // Autosave while there are unsaved changes, as often as Preferences ▸
+    // General says (every 15 seconds by default).
     Timer {
-        interval: 15000
+        id: autosaveTimer
+        interval: Math.max(5, Theme.autosaveSeconds) * 1000
         repeat: true
         running: Wordloom.projectOpen
         onTriggered: if (Wordloom.dirty) { if (win.ws) win.ws.flush(); Api.call("save"); }
@@ -325,7 +337,6 @@ ApplicationWindow {
             Action { text: qsTr("&Save"); shortcut: StandardKey.Save; enabled: Wordloom.projectOpen; onTriggered: win.saveNow() }
             Action { text: qsTr("Save &As…"); enabled: Wordloom.projectOpen; onTriggered: saveAsDialog.open() }
             Action { text: qsTr("&Back Up to Zip…"); enabled: Wordloom.projectOpen; onTriggered: backupDialog.start() }
-            Action { text: qsTr("Automatic Bac&kups…"); onTriggered: autoBackupDialog.open() }
             Action { text: qsTr("Restore from &Zip Backup…"); onTriggered: restoreZipDialog.start() }
             Action { text: qsTr("Import &Manuscript…"); enabled: win.ws !== null; onTriggered: manuscriptDialog.open() }
             Action { text: qsTr("&Import File…"); shortcut: "Ctrl+Shift+I"; enabled: win.ws !== null; onTriggered: importDialog.open() }
@@ -370,6 +381,8 @@ ApplicationWindow {
             }
             Action { text: qsTr("Insert &Comment"); shortcut: "Ctrl+Alt+M"; enabled: win.ws !== null; onTriggered: win.ws.insertComment() }
             Action { text: qsTr("Insert &Footnote"); shortcut: "Ctrl+Alt+F"; enabled: win.ws !== null; onTriggered: win.ws.insertFootnote() }
+            MenuSeparator {}
+            Action { text: qsTr("Pre&ferences…"); shortcut: "Ctrl+,"; onTriggered: prefsDialog.open() }
         }
         Menu {
             title: qsTr("&Project")
@@ -419,69 +432,14 @@ ApplicationWindow {
             MenuSeparator {}
             Action { text: qsTr("Highlight Re&peated Words"); checkable: true; checked: Theme.highlightRepeats; onTriggered: Theme.highlightRepeats = !Theme.highlightRepeats }
             Action { text: qsTr("&Highlight Current Line"); checkable: true; checked: Theme.lineHighlight; onTriggered: Theme.lineHighlight = !Theme.lineHighlight }
-            Menu {
-                title: qsTr("Line Highlight &Colour")
-                // Presets (translucent, so text stays readable in either theme).
-                Repeater {
-                    model: [
-                        { name: qsTr("Amber"), c: "#40f2c14e" }, { name: qsTr("Blue"), c: "#3d5b9bd5" },
-                        { name: qsTr("Green"), c: "#3d6abf69" }, { name: qsTr("Rose"), c: "#3de57399" },
-                        { name: qsTr("Grey"), c: "#30808080" }
-                    ]
-                    delegate: MenuItem {
-                        required property var modelData
-                        text: modelData.name
-                        checkable: true
-                        checked: Qt.colorEqual(Theme.lineHighlightColor, modelData.c)
-                        indicator: Rectangle { x: 8; anchors.verticalCenter: parent.verticalCenter; width: 14; height: 14; radius: 3; color: modelData.c; border.color: Theme.border; border.width: parent.checked ? 2 : 1 }
-                        onTriggered: { Theme.lineHighlightColor = modelData.c; Theme.lineHighlight = true; }
-                    }
-                }
-                MenuSeparator {}
-                Action { text: qsTr("Custom Colour…"); onTriggered: { lineColourDialog.selectedColor = Theme.lineHighlightColor; lineColourDialog.open(); } }
-            }
-            Action { text: qsTr("Complete &Names"); checkable: true; checked: Theme.completeNames; onTriggered: Theme.completeNames = !Theme.completeNames }
-            Action { text: qsTr("Smart &Punctuation"); checkable: true; checked: Theme.smartPunctuation; onTriggered: Theme.smartPunctuation = !Theme.smartPunctuation }
             Action { text: qsTr("Check &Spelling"); shortcut: "F7"; checkable: true; checked: Theme.spellCheck; onTriggered: Theme.spellCheck = !Theme.spellCheck }
-            Menu {
-                id: spellLanguageMenu
-                title: qsTr("Spelling &Language")
-                // Installed dictionaries, read each time the menu opens.
-                property var info: ({ chosen: "", system: "", systemName: "", list: [] })
-                onAboutToShow: info = Api.call("spellLanguages") || info
-                MenuItem {
-                    text: spellLanguageMenu.info.system ? qsTr("Automatic: %1").arg(spellLanguageMenu.info.systemName) : qsTr("Automatic")
-                    checkable: true
-                    checked: Theme.spellLanguage === ""
-                    onTriggered: win.setSpellLanguage("")
-                }
-                MenuSeparator {}
-                Instantiator {
-                    model: spellLanguageMenu.info.list
-                    delegate: MenuItem {
-                        required property var modelData
-                        text: modelData.name
-                        checkable: true
-                        checked: Theme.spellLanguage === modelData.code
-                        onTriggered: win.setSpellLanguage(modelData.code)
-                    }
-                    onObjectAdded: (index, object) => spellLanguageMenu.insertItem(2 + index, object)
-                    onObjectRemoved: (index, object) => spellLanguageMenu.removeItem(object)
-                }
-            }
             Action { text: qsTr("Styled &Markdown"); checkable: true; checked: Theme.styledMarkdown; onTriggered: Theme.styledMarkdown = !Theme.styledMarkdown }
-            Action { text: qsTr("Editor &Font && Spacing…"); onTriggered: win.ws.openTextSettings() }
+            Action { text: qsTr("Editor &Font && Spacing…"); onTriggered: prefsDialog.openAt("font") }
             Menu {
                 title: qsTr("&Zoom (%1)").arg(Theme.zoomText)
                 Action { text: qsTr("Zoom &In"); shortcut: StandardKey.ZoomIn; onTriggered: Theme.zoomIn() }
                 Action { text: qsTr("Zoom &Out"); shortcut: StandardKey.ZoomOut; onTriggered: Theme.zoomOut() }
                 Action { text: qsTr("&Actual Size"); shortcut: "Ctrl+0"; onTriggered: Theme.resetZoom() }
-            }
-            Menu {
-                title: qsTr("Appearance")
-                Action { text: qsTr("Follow System"); checkable: true; checked: Theme.forced === ""; onTriggered: Theme.forced = "" }
-                Action { text: qsTr("Light"); checkable: true; checked: Theme.forced === "light"; onTriggered: Theme.forced = "light" }
-                Action { text: qsTr("Dark"); checkable: true; checked: Theme.forced === "dark"; onTriggered: Theme.forced = "dark" }
             }
         }
         Menu {
@@ -508,7 +466,7 @@ ApplicationWindow {
     }
     Component {
         id: workspaceComp
-        Workspace { sprint: sprintDialog; onHistoryRequested: historyWindow.show() }
+        Workspace { sprint: sprintDialog; onHistoryRequested: historyWindow.show(); onPreferencesRequested: (page) => prefsDialog.openAt(page) }
     }
 
     // ---- toast / error banner ----
@@ -550,7 +508,7 @@ ApplicationWindow {
         // (Api.call, not Api.get: this works with no project open.)
         property var templates: []
         readonly property string template: templates.length ? templates[Math.max(0, newTemplate.currentIndex)].id : "blank"
-        onAboutToShow: { templates = Api.call("templates") || []; newTitle.text = ""; newAuthor.text = ""; newTitle.forceActiveFocus(); }
+        onAboutToShow: { folder = Theme.newProjectsFolder; templates = Api.call("templates") || []; newTitle.text = ""; newAuthor.text = ""; newTitle.forceActiveFocus(); }
         GridLayout {
             anchors.fill: parent
             columns: 2
@@ -587,7 +545,7 @@ ApplicationWindow {
         onAccepted: {
             if (folder.toString() === "") { Api.say(qsTr("Choose where to create the project.")); return; }
             const t = newTitle.text.trim() || "Untitled";
-            if (Wordloom.projectOpen) { if (ws) ws.flush(); autoBackupDialog.beforeClose(); }
+            if (Wordloom.projectOpen) { if (ws) ws.flush(); autoBackup.beforeClose(); }
             Api.call("newProject", folder.toString(), t, newAuthor.text, template);
         }
     }
@@ -625,12 +583,6 @@ ApplicationWindow {
 
     CompileDialog { id: compileDialog; anchors.centerIn: parent }
     NameDialog { id: nameDialog; anchors.centerIn: parent }
-    ColorDialog {
-        id: lineColourDialog
-        title: qsTr("Line Highlight Colour")
-        options: ColorDialog.ShowAlphaChannel
-        onAccepted: { Theme.lineHighlightColor = selectedColor; Theme.lineHighlight = true; }
-    }
     GoToPopup {
         id: goTo
         onChosen: (id) => { Api.call("reveal", id); win.ws.select(id); }
@@ -752,7 +704,7 @@ ApplicationWindow {
         fileMode: FileDialog.OpenFile
         nameFilters: [qsTr("Zip backups (*.zip)")]
         function start() {
-            currentFolder = autoBackupDialog.closeBackups ? autoBackupDialog.where
+            currentFolder = autoBackup.closeBackups ? autoBackup.where
                 : (backupDialog.lastFolder || StandardPaths.writableLocation(StandardPaths.DocumentsLocation));
             open();
         }
@@ -769,20 +721,16 @@ ApplicationWindow {
         onAccepted: win.restoreZip(zip, selectedFolder.toString())
     }
     function restoreZip(zip, folder) {
-        if (Wordloom.projectOpen) { if (ws) ws.flush(); autoBackupDialog.beforeClose(); Api.call("close"); }
+        if (Wordloom.projectOpen) { if (ws) ws.flush(); autoBackup.beforeClose(); Api.call("close"); }
         const r = Api.call("restoreZip", zip, folder);
         if (r) Api.say(qsTr("Restored to %1").arg(r.path));
         return r;
     }
-    // File ▸ Automatic Backups…: a zip of the project, in a folder of your
-    // choice, each time it's closed (if anything changed), keeping the
-    // newest few (Session::auto_backup).
-    Dialog {
-        id: autoBackupDialog
-        title: qsTr("Automatic Backups")
-        modal: true
-        anchors.centerIn: parent
-        width: Math.min(520, win.width - 32)
+    // Automatic backups (Preferences ▸ Backups): a zip of the project, in a
+    // folder of your choice, each time it's closed (if anything changed),
+    // keeping the newest few (Session::auto_backup).
+    QtObject {
+        id: autoBackup
         property bool closeBackups: false
         property string folder: ""
         property int keep: 10
@@ -800,48 +748,14 @@ ApplicationWindow {
         // Called just before a project closes (Close Project, opening or
         // creating another, quitting).
         function beforeClose() { if (closeBackups && Wordloom.projectOpen) run(true); }
-        ColumnLayout {
-            anchors.fill: parent
-            spacing: 10
-            CheckBox {
-                id: autoOn
-                text: qsTr("Back up to a zip file whenever a project is closed")
-                checked: autoBackupDialog.closeBackups
-                onToggled: autoBackupDialog.closeBackups = checked
-            }
-            RowLayout {
-                Layout.fillWidth: true
-                Label { text: qsTr("Folder") }
-                Label {
-                    Layout.fillWidth: true
-                    elide: Text.ElideMiddle
-                    text: decodeURIComponent(autoBackupDialog.where.replace(/^file:\/\//, ""))
-                    color: Theme.subtext
-                }
-                Button { text: qsTr("Choose…"); onClicked: autoFolderDialog.open() }
-            }
-            RowLayout {
-                Label { text: qsTr("Keep the newest") }
-                SpinBox { id: autoKeep; from: 1; to: 100; editable: true; value: autoBackupDialog.keep; onValueModified: autoBackupDialog.keep = value }
-                Label { text: qsTr("backups of each project") }
-            }
-            Label {
-                Layout.fillWidth: true
-                wrapMode: Text.Wrap
-                color: Theme.subtext
-                text: qsTr("Backups are named like \u201cTitle autobackup 2026-11-06 1730.zip\u201d. If nothing has changed since the last one, no new zip is made. Older automatic backups beyond the number kept are deleted; other files in the folder, including ones made with Back Up to Zip, are left alone. Choose a folder on another drive or a synced cloud folder so a backup survives losing this disk.")
-            }
-        }
-        footer: DialogButtonBox {
-            Button { text: qsTr("Back Up Now"); enabled: Wordloom.projectOpen; onClicked: autoBackupDialog.run(false) }
-            Button { text: qsTr("Close"); DialogButtonBox.buttonRole: DialogButtonBox.RejectRole }
-        }
     }
-    FolderDialog {
-        id: autoFolderDialog
-        title: qsTr("Keep automatic backups in…")
-        currentFolder: autoBackupDialog.where
-        onAccepted: autoBackupDialog.folder = selectedFolder.toString()
+    PreferencesDialog {
+        id: prefsDialog
+        win: win
+        autoBackup: autoBackup
+        anchors.centerIn: parent
+        width: Math.min(820, win.width - 32)
+        height: Math.min(600, win.height - 32)
     }
     // File ▸ Import Manuscript…: a whole book from Word, Markdown or text,
     // split into chapters and scenes (wordloom-core's import.rs).

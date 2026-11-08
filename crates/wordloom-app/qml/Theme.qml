@@ -74,6 +74,21 @@ QtObject {
     property bool highlightRepeats: false   // tint words repeated nearby (repeats.rs)
     property color lineHighlightColor: "#40f2c14e"
 
+    // Preferences ▸ General: reopen the last project at startup, how often
+    // to autosave, and where New Project suggests creating projects
+    // ("" = Documents/Wordloom).
+    property bool reopenLast: false
+    property int autosaveSeconds: 15
+    property string projectsFolder: ""
+    readonly property string defaultProjectsFolder: StandardPaths.writableLocation(StandardPaths.DocumentsLocation).toString() + "/Wordloom"
+    readonly property string newProjectsFolder: projectsFolder || defaultProjectsFolder
+    property Settings general: Settings {
+        category: "general"
+        property alias reopenLast: theme.reopenLast
+        property alias autosaveSeconds: theme.autosaveSeconds
+        property alias projectsFolder: theme.projectsFolder
+    }
+
     // Remembered between runs (~/.config/Wordloom/Wordloom.conf on Linux).
     property Settings prefs: Settings {
         category: "appearance"

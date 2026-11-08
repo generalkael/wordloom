@@ -254,9 +254,9 @@ Item {
         if (!inSplit && viewMode !== "editor") viewMode = "editor";
         (inSplit ? splitEditor : editorView).setParagraphStyle(style);
     }
-    // View ▸ Editor Font & Spacing… (and the editor's Aa button).
-    function openTextSettings() { textSettings.open(); }
-    function textSettingsRef() { return textSettings; }
+    // The editor's Aa button: Preferences ▸ Font & Spacing (in Main.qml).
+    signal preferencesRequested(string page)
+    function openTextSettings() { preferencesRequested("font"); }
     // Insert a {>> comment <<} where you are typing.
     function insertComment() {
         if (!inSplit && viewMode !== "editor") viewMode = "editor";
@@ -285,7 +285,7 @@ Item {
         Qt.callLater(() => ed.showComment(docId, n));
     }
     function eventDialog() { return gantt.eventDialogRef; }
-    function closePopups() { gantt.closeDialogs(); compareDialog.close(); textSettings.close(); relationsView.dialogRef.close(); }
+    function closePopups() { gantt.closeDialogs(); compareDialog.close(); relationsView.dialogRef.close(); }
     function relationDialogRef() { return relationsView.dialogRef; }
     // Compare a snapshot of the current document with its text now (the
     // first snapshot if `snapId` is empty).
@@ -623,10 +623,6 @@ Item {
         }
     }
 
-    TextSettingsDialog {
-        id: textSettings
-        anchors.centerIn: Overlay.overlay
-    }
     CompareDialog {
         id: compareDialog
         parent: Overlay.overlay

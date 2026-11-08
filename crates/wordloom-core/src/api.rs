@@ -121,6 +121,8 @@ const READ_ONLY: &[&str] = &[
     "spellSuggest",
     "spellCheck",
     "spellAdd",
+    "spellWords",
+    "spellRemove",
     "spellInfo",
     "spellLanguages",
     "spellSetLanguage",
@@ -522,6 +524,8 @@ impl App {
                 crate::spell::with(|s| s.add_personal(a.str(0)))?;
                 json!(true)
             }
+            "spellWords" => json!(crate::spell::with(|s| s.personal_words())),
+            "spellRemove" => json!(crate::spell::with(|s| s.remove_personal(a.str(0)))?),
             "spellInfo" => json!({ "dictionary": crate::spell::with(|s| s.source.clone()) }),
             "spellLanguages" => {
                 let (chosen, system) = crate::spell::language();

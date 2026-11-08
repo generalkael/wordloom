@@ -263,6 +263,31 @@ impl Speller {
         Ok(())
     }
 
+    /// The personal word list, sorted case-insensitively (Preferences ▸ Writing).
+    pub fn personal_words(&self) -> Vec<String> {
+        let mut v: Vec<String> = self.personal.iter().cloned().collect();
+        v.sort_by_key(|w| (w.to_lowercase(), w.clone()));
+        v
+    }
+
+    /// Stop accepting `word` (unless the dictionary has it) and rewrite the
+    /// personal list without it. False if it wasn't in the list.
+    pub fn remove_personal(&mut self, word: &str) -> crate::Result<bool> {
+        let word = word.trim().replace('’', "'");
+        if !self.personal.remove(&word) {
+            return Ok(false);
+        }
+        if let Some(path) = &self.personal_path {
+            let mut text = String::new();
+            for w in self.personal_words() {
+                text.push_str(&w);
+                text.push('\n');
+            }
+            crate::storage::write_atomic(path, text.as_bytes())?;
+        }
+        Ok(true)
+    }
+
     /// Words always accepted for the open project (character and place names).
     pub fn set_project_words(&mut self, words: HashSet<String>) {
         self.project = words;
@@ -271,7 +296,7 @@ impl Speller {
 
 static GLOBAL: OnceLock<Mutex<Option<Speller>>> = OnceLock::new();
 static PERSONAL_PATH: OnceLock<PathBuf> = OnceLock::new();
-/// The language chosen in View ▸ Spelling Language (None: automatic).
+/// The language chosen in Preferences ▸ Spelling & Typing (None: automatic).
 static LANGUAGE: Mutex<Option<String>> = Mutex::new(None);
 
 /// Where the personal word list lives; call once at startup.
@@ -362,7 +387,15 @@ mod tests {
         assert!(!s.check("grimdark"));
         s.add_personal("grimdark").unwrap();
         assert!(s.check("grimdark"));
-        let again = Speller::load(Some("xx_XX"), s.personal_path.clone());
+        let mut again = Speller::load(Some("xx_XX"), s.personal_path.clone());
         assert!(again.check("grimdark"));
+        // …and can be listed and removed again.
+        again.add_personal("Aether").unwrap();
+        assert_eq!(again.personal_words(), ["Aether", "grimdark"]);
+        assert!(again.remove_personal("grimdark").unwrap());
+        assert!(!again.remove_personal("grimdark").unwrap());
+        assert!(!again.check("grimdark"));
+        let third = Speller::load(Some("xx_XX"), s.personal_path.clone());
+        assert_eq!(third.personal_words(), ["Aether"]);
     }
 }

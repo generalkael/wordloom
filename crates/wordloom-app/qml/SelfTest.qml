@@ -14,7 +14,8 @@ Item {
     property var compile                 // CompileDialog
     property var groupStart: null        // spots before a group drag (freeform groups)
     property var goTo                    // GoToPopup
-    property var autoBackup              // Main.qml's Automatic Backups dialog
+    property var autoBackup              // Main.qml's automatic backups
+    property var prefs                   // PreferencesDialog
     property var grid                    // PresenceDialog
     property int step: 0
     InputSim { id: input }
@@ -167,8 +168,26 @@ Item {
             check(Math.abs(a.lineHeightAt(a.length) - 2) < 0.01, "new paragraphs get it too");
             Theme.lineHeight = 1.45;
             ws().openTextSettings();
-            check(ws().textSettingsRef().opened, "the font and spacing dialog opens");
-            ws().textSettingsRef().close();
+            check(prefs.opened && prefs.page === "font", "the editor's Aa button opens Preferences at Font & Spacing (" + prefs.page + ")");
+            prefs.close();
+        }],
+        ["preferences", () => {
+            prefs.openAt("writing");
+            check(prefs.opened && prefs.page === "writing", "Preferences opens at a chosen page");
+            check(!Api.call("spellCheck", "zorblaxian"), "a made-up word is misspelled");
+            check(!prefs.addWord("two words"), "a phrase can't be added to the dictionary");
+            check(prefs.addWord("zorblaxian") && prefs.words.indexOf("zorblaxian") >= 0 && Api.call("spellCheck", "zorblaxian"), "a word added in Preferences is listed and accepted");
+            prefs.wordFilter = "zorbl";
+            check(prefs.shownWords.length === 1, "the word list filters (" + prefs.shownWords + ")");
+            prefs.wordFilter = "";
+            check(prefs.removeWord("zorblaxian") && prefs.words.indexOf("zorblaxian") < 0 && !Api.call("spellCheck", "zorblaxian"), "removing it there makes it misspelled again");
+            Theme.autosaveSeconds = 60;
+            check(win.autosaveMs() === 60000, "the autosave period follows the preference (" + win.autosaveMs() + ")");
+            Theme.autosaveSeconds = 15;
+            check(Theme.projectsFolder === "" && Theme.newProjectsFolder.endsWith("/Wordloom"), "new projects go in Documents/Wordloom by default (" + Theme.newProjectsFolder + ")");
+            prefs.openAt("nonsense");
+            check(prefs.page === "writing", "an unknown page leaves the page as it was");
+            prefs.close();
         }],
         ["indent and blank lines", () => {
             const a = ed().firstArea();
