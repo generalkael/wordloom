@@ -40,6 +40,9 @@ jobs:
           if (-not (Test-Path $exe)) { throw "$exe was not installed" }
           $sample = "$env:RUNNER_TEMP\sample"; $shots = "$env:RUNNER_TEMP\shots"
           New-Item -ItemType Directory -Force $sample, $shots | Out-Null
+          # Only the installed copy of Qt: drop the paths install-qt-action set.
+          Remove-Item Env:QT_PLUGIN_PATH, Env:QML2_IMPORT_PATH -ErrorAction SilentlyContinue
+          $env:PATH = ($env:PATH -split ';' | Where-Object { $_ -and -not $_.StartsWith($env:QT_ROOT_DIR) }) -join ';'
           # A GUI-subsystem app: PowerShell doesn't wait for it on its own.
           $p = Start-Process $exe -ArgumentList "--sample=$sample", "--screenshots=$shots" -PassThru
           if (-not $p.WaitForExit(300000)) { $p.Kill(); throw 'The screenshot tour timed out' }
@@ -80,7 +83,12 @@ jobs:
           cp -R "$mnt/Wordloom.app" "$RUNNER_TEMP/"
           hdiutil detach "$mnt"
           mkdir -p "$RUNNER_TEMP/sample" "$RUNNER_TEMP/shots"
-          timeout 300 "$RUNNER_TEMP/Wordloom.app/Contents/MacOS/Wordloom" \
+          # macOS has no timeout(1): perl's alarm stands in. The Qt paths
+          # install-qt-action sets are cleared, so only the bundle's own
+          # frameworks, plugins and QML modules are used.
+          env -u QT_PLUGIN_PATH -u QML2_IMPORT_PATH -u QT_ROOT_DIR \
+            perl -e 'alarm shift; exec @ARGV' 300 \
+            "$RUNNER_TEMP/Wordloom.app/Contents/MacOS/Wordloom" \
             --sample="$RUNNER_TEMP/sample" --screenshots="$RUNNER_TEMP/shots"
           ls "$RUNNER_TEMP/shots"
           test "$(ls "$RUNNER_TEMP/shots" | wc -l)" -ge 15
