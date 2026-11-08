@@ -45,11 +45,11 @@ fn main() {
         println!("cargo:rerun-if-changed={f}");
     }
 
-    // Item icons (SVG), served next to the QML at qrc:/qt/qml/com/wordloom/app/qml/icons/.
+    // Item icons (SVG) and the window icon (wordloom.png), served next to the QML at qrc:/qt/qml/com/wordloom/app/qml/icons/.
     let icons: Vec<String> = std::fs::read_dir("qml/icons")
         .expect("qml/icons")
         .filter_map(|e| e.ok()?.path().to_str().map(String::from))
-        .filter(|p| p.ends_with(".svg"))
+        .filter(|p| p.ends_with(".svg") || p.ends_with(".png"))
         .collect();
     println!("cargo:rerun-if-changed=qml/icons");
 

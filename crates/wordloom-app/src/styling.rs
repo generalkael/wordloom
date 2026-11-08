@@ -7,6 +7,8 @@ pub mod ffi {
         include!("wordloom/src/styler.h");
         /// Registers `MarkdownStyler` as `import com.wordloom.styling`.
         fn register_styler_types();
+        /// Sets the application's window icon.
+        fn set_app_icon();
     }
 
     extern "Rust" {

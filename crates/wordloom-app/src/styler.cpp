@@ -7,6 +7,9 @@
 #include "keytext.h"
 #include "pdfexport.h"
 
+#include <QFile>
+#include <QGuiApplication>
+#include <QIcon>
 #include <QRegularExpression>
 #include <QTextBlock>
 #include <QTextCursor>
@@ -16,6 +19,7 @@
 #include <QTextDocument>
 #include <QtQml/qqml.h>
 #include <algorithm>
+#include <cstdio>
 #include <vector>
 
 static bool isWordChar(QChar c)
@@ -647,4 +651,12 @@ void register_styler_types()
     qmlRegisterType<PdfExporter>("com.wordloom.styling", 1, 0, "PdfExporter");
     qmlRegisterType<InputSim>("com.wordloom.styling", 1, 0, "InputSim");
     qmlRegisterType<KeyText>("com.wordloom.styling", 1, 0, "KeyText");
+}
+
+void set_app_icon()
+{
+    const QString path = QStringLiteral(":/qt/qml/com/wordloom/app/qml/icons/wordloom.png");
+    if (!QFile::exists(path))
+        fprintf(stderr, "wordloom: window icon %s is missing\n", qPrintable(path));
+    QGuiApplication::setWindowIcon(QIcon(path));
 }

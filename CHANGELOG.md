@@ -22,6 +22,11 @@ Notable changes to Wordloom. Each entry lands in the same commit as the change i
   last project at startup, how often to autosave (5 seconds to 5 minutes), the folder New Project
   suggests (it now starts filled in, with Documents/Wordloom), and **your dictionary**, which
   lists the words you've added and can find, add and remove them.
+- **Windows and macOS installers.** A release workflow builds a Windows MSI (Program Files, Start
+  menu shortcut, upgrades in place) and an Apple Silicon DMG, along with the AppImage. It installs
+  and smoke-tests each one, and a version tag gathers them into a draft GitHub release. The scripts
+  are `packaging/windows/build-msi.ps1` and `packaging/macos/build-dmg.sh`. Wordloom now has a
+  window icon, and on Windows it no longer opens a console window.
 - **Freeform corkboards.** Switch a board from *Grid* to *Freeform* and cards stay wherever you
   drop them, without changing the binder. *Arrange ▾* ▸ *Tidy Up* puts them back in slots and
   *Order Binder by Board* reorders the folder to match the board (rows, left to right). Ctrl+arrows

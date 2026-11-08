@@ -7,3 +7,5 @@
 /.flatpak-builder
 /build-dir
 /*.flatpak
+/*.msi
+/*.dmg

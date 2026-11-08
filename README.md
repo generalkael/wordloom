@@ -6,9 +6,9 @@ snapshots, compile) without copying it, and adds a **story-timeline Gantt chart*
 characters, events and plotlines in time.
 
 It runs on Linux today. The code is written to build unchanged on Windows and macOS, since Qt and
-Rust both support those platforms. CI currently builds Linux only: Windows CI is paused
-until the Linux version is complete (it passed when last enabled), and macOS CI waits on a Qt
-version that supports the macOS 26 SDK.
+Rust both support those platforms. CI builds and tests Linux on every push. The Windows installer
+(MSI) and macOS disk image (DMG) are built by a separate release workflow, which has not yet been
+run (see [Installing on Windows and macOS](#installing-on-windows-and-macos)).
 
 ![Wordloom's editor with styled Markdown, the binder and the Details panel](docs/screenshots/editor.png)
 
@@ -178,6 +178,38 @@ The desktop entry, icon and AppStream metadata are in `packaging/linux/` and use
 The Flatpak build is offline, as Flathub requires: every crate is listed with its checksum in
 `packaging/flatpak/cargo-sources.json`. After changing `Cargo.lock`, regenerate it with
 `packaging/flatpak/cargo-sources.py`; CI fails if it is out of date.
+
+## Installing on Windows and macOS
+
+The [Release workflow](.github/workflows/release.yml) builds a Windows installer and a macOS disk
+image, alongside the AppImage. It installs each one on a GitHub runner and runs the screenshot tour
+of the sample project as a smoke test. Run it from *Actions ▸ Release ▸ Run workflow* to get the
+installers as artifacts. Pushing a tag that matches the version in `Cargo.toml` (`v0.1.0`) also
+gathers them into a **draft** GitHub release, which you check and publish.
+
+**Windows:** `Wordloom-<version>-x64.msi` installs into *Program Files* with a Start menu shortcut,
+and shows in *Settings ▸ Apps* for uninstalling. A newer MSI replaces an older install. It bundles Qt
+and the Visual C++ runtime. The MSI isn't code-signed, so SmartScreen warns the first time it runs:
+choose *More info ▸ Run anyway*.
+
+**macOS:** `Wordloom-<version>-arm64.dmg`, for Apple Silicon. Open it and drag Wordloom onto
+*Applications*. Without a Developer ID the app is signed ad hoc, so the first time, right-click it
+and choose *Open* (or allow it in *System Settings ▸ Privacy & Security*).
+
+To build them yourself:
+
+- **Windows:** run `packaging\windows\build-msi.ps1` in PowerShell. It needs the MSVC build tools,
+  Qt 6 for MSVC (with `windeployqt` on `PATH`, or `QT_ROOT_DIR` set) and the .NET SDK. It installs
+  the [WiX Toolset](https://wixtoolset.org) 5 if it's missing. The installer is described in
+  `packaging/windows/Wordloom.wxs`.
+- **macOS:** run `packaging/macos/build-dmg.sh`. It needs the Xcode command-line tools and Qt 6 (with
+  `macdeployqt` on `PATH`, or `QT_ROOT_DIR` set). To sign with a Developer ID and the hardened
+  runtime, set `MACOS_SIGN_IDENTITY`. To also notarize and staple, set `MACOS_NOTARY_PROFILE` to a
+  `xcrun notarytool store-credentials` profile.
+
+The icons (`packaging/windows/wordloom.ico`, `packaging/macos/Wordloom.icns` and the window icon
+`crates/wordloom-app/qml/icons/wordloom.png`) are made from `packaging/linux/io.github.generalkael.Wordloom.svg`
+by `packaging/make-icons.py`. Rerun it after changing the SVG.
 
 ## Building
 
@@ -379,7 +411,9 @@ their own preferences and recent-projects list.
 
 ## Roadmap
 
-- Packaged installers for Windows (MSI) and macOS (DMG); the Linux AppImage and Flatpak are done
+- Windows and macOS installers: the build scripts and release workflow are ready. What's left is
+  the first run of the workflow, and code signing (an Authenticode certificate for Windows, an
+  Apple Developer ID for macOS) so the installers open without a warning
 - Flathub submission: the manifest and metadata are ready; what's left is opening the submission
   pull request on flathub/flathub
 

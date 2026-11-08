@@ -1,0 +1,149 @@
+name: Release
+
+# Builds the installers: Windows MSI, macOS DMG and Linux AppImage. Each is
+# installed and smoke-tested with the screenshot tour of the sample project.
+#
+# - Run it by hand (Actions ▸ Release ▸ Run workflow) to get the installers
+#   as workflow artifacts.
+# - Push a tag such as v0.2.0 (matching the version in Cargo.toml) to also
+#   collect them into a draft GitHub release, to check and publish.
+on:
+  workflow_dispatch:
+  push:
+    tags: ["v*"]
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: jurplel/install-qt-action@v4
+        with:
+          version: "6.8.*"
+          modules: qtpdf
+          cache: true
+      - name: Build the MSI
+        shell: pwsh
+        run: packaging\windows\build-msi.ps1
+      - name: Install it and run the screenshot tour
+        shell: pwsh
+        run: |
+          $msi = (Get-ChildItem Wordloom-*-x64.msi).FullName
+          $p = Start-Process msiexec -ArgumentList '/i', "`"$msi`"", '/qn', '/l*v', 'install.log' -Wait -PassThru
+          if ($p.ExitCode -ne 0) { Get-Content install.log -Tail 50; throw "msiexec exited with $($p.ExitCode)" }
+          $exe = "$env:ProgramFiles\Wordloom\wordloom.exe"
+          if (-not (Test-Path $exe)) { throw "$exe was not installed" }
+          $sample = "$env:RUNNER_TEMP\sample"; $shots = "$env:RUNNER_TEMP\shots"
+          New-Item -ItemType Directory -Force $sample, $shots | Out-Null
+          # A GUI-subsystem app: PowerShell doesn't wait for it on its own.
+          $p = Start-Process $exe -ArgumentList "--sample=$sample", "--screenshots=$shots" -PassThru
+          if (-not $p.WaitForExit(300000)) { $p.Kill(); throw 'The screenshot tour timed out' }
+          if ($p.ExitCode -ne 0) { throw "Wordloom exited with $($p.ExitCode)" }
+          $n = (Get-ChildItem $shots).Count
+          Write-Host "$n screenshots"
+          if ($n -lt 15) { throw "Only $n screenshots" }
+          Copy-Item -Recurse $shots windows-shots
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-msi
+          path: Wordloom-*-x64.msi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: windows-screenshots
+          path: windows-shots
+
+  macos:
+    # Qt 6.8 doesn't build against the macOS 26 SDK (it links the removed AGL
+    # framework), so the Mac build uses a newer Qt.
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: jurplel/install-qt-action@v4
+        with:
+          version: "6.10.*"
+          modules: qtpdf
+          cache: true
+      - name: Build the DMG
+        run: packaging/macos/build-dmg.sh
+      - name: Install it and run the screenshot tour
+        run: |
+          dmg=$(ls Wordloom-*.dmg)
+          mnt=$(mktemp -d)
+          hdiutil attach "$dmg" -nobrowse -mountpoint "$mnt"
+          cp -R "$mnt/Wordloom.app" "$RUNNER_TEMP/"
+          hdiutil detach "$mnt"
+          mkdir -p "$RUNNER_TEMP/sample" "$RUNNER_TEMP/shots"
+          timeout 300 "$RUNNER_TEMP/Wordloom.app/Contents/MacOS/Wordloom" \
+            --sample="$RUNNER_TEMP/sample" --screenshots="$RUNNER_TEMP/shots"
+          ls "$RUNNER_TEMP/shots"
+          test "$(ls "$RUNNER_TEMP/shots" | wc -l)" -ge 15
+          cp -R "$RUNNER_TEMP/shots" macos-shots
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos-dmg
+          path: Wordloom-*.dmg
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: macos-screenshots
+          path: macos-shots
+
+  appimage:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: jurplel/install-qt-action@v4
+        with:
+          version: "6.8.*"
+          modules: qtpdf
+          cache: true
+      - run: sudo apt-get update && sudo apt-get install -y libgl1-mesa-dev libxkbcommon-dev
+      - run: packaging/linux/build-appimage.sh
+      - name: Smoke test (screenshot tour of the sample project)
+        run: |
+          mkdir -p "$RUNNER_TEMP/sample" "$RUNNER_TEMP/shots"
+          QT_QPA_PLATFORM=offscreen APPIMAGE_EXTRACT_AND_RUN=1 timeout 180 \
+            ./Wordloom-x86_64.AppImage --sample="$RUNNER_TEMP/sample" --screenshots="$RUNNER_TEMP/shots"
+          test "$(ls "$RUNNER_TEMP/shots" | wc -l)" -ge 15
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-appimage
+          path: Wordloom-x86_64.AppImage
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [windows, macos, appimage]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+      - name: The tag matches Cargo.toml's version
+        run: |
+          version=$(sed -n 's/^version *= *"\([^"]*\)".*/\1/p' Cargo.toml | head -1)
+          if [ "${GITHUB_REF_NAME}" != "v$version" ]; then
+            echo "Tag ${GITHUB_REF_NAME} doesn't match version $version in Cargo.toml."; exit 1
+          fi
+      - uses: actions/download-artifact@v5
+        with:
+          pattern: "*-{msi,dmg,appimage}"
+          merge-multiple: true
+          path: dist
+      - name: Draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          ls -l dist
+          # The AppImage gets the version in its name, like the others.
+          version=${GITHUB_REF_NAME#v}
+          mv dist/Wordloom-x86_64.AppImage "dist/Wordloom-$version-x86_64.AppImage"
+          gh release create "$GITHUB_REF_NAME" dist/* --draft --verify-tag \
+            --title "Wordloom $version" --generate-notes

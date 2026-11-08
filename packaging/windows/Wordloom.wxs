@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Wordloom's Windows installer (WiX Toolset 5). Built by build-msi.ps1, which
+  passes the version and the staged app folder (wordloom.exe with Qt deployed
+  next to it by windeployqt):
+
+    wix build Wordloom.wxs -arch x64 -ext WixToolset.UI.wixext
+        -d Version=0.1.0 -d StageDir=...\stage -o Wordloom-0.1.0-x64.msi
+-->
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
+     xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui">
+  <!-- The UpgradeCode never changes: it is how a newer Wordloom MSI finds
+       and replaces an installed older one. -->
+  <Package Name="Wordloom"
+           Manufacturer="Scott Weeks"
+           Version="$(Version)"
+           UpgradeCode="6C1E5C8E-3B0F-4F5C-9E57-2B7A8E4D1A90"
+           Scope="perMachine">
+    <SummaryInformation Description="Wordloom, a writing studio for novelists" />
+    <MajorUpgrade DowngradeErrorMessage="A newer version of Wordloom is already installed." />
+    <MediaTemplate EmbedCab="yes" />
+
+    <Icon Id="wordloom.ico" SourceFile="wordloom.ico" />
+    <Property Id="ARPPRODUCTICON" Value="wordloom.ico" />
+    <Property Id="ARPURLINFOABOUT" Value="https://github.com/generalkael/wordloom" />
+
+    <StandardDirectory Id="ProgramFiles64Folder">
+      <Directory Id="INSTALLFOLDER" Name="Wordloom" />
+    </StandardDirectory>
+
+    <Feature Id="Main" Title="Wordloom">
+      <!-- Everything windeployqt staged: the app, Qt's DLLs, plugins and QML. -->
+      <Files Include="$(StageDir)\**" Directory="INSTALLFOLDER" />
+      <ComponentRef Id="StartMenuShortcut" />
+    </Feature>
+
+    <StandardDirectory Id="ProgramMenuFolder">
+      <Component Id="StartMenuShortcut">
+        <Shortcut Id="WordloomShortcut"
+                  Name="Wordloom"
+                  Description="A writing studio for novelists"
+                  Target="[INSTALLFOLDER]wordloom.exe"
+                  WorkingDirectory="INSTALLFOLDER"
+                  Icon="wordloom.ico" />
+        <RegistryValue Root="HKLM" Key="Software\Wordloom" Name="StartMenuShortcut"
+                       Type="integer" Value="1" KeyPath="yes" />
+      </Component>
+    </StandardDirectory>
+
+    <!-- Welcome, licence, install folder, progress, finish. -->
+    <ui:WixUI Id="WixUI_InstallDir" InstallDirectory="INSTALLFOLDER" />
+    <WixVariable Id="WixUILicenseRtf" Value="$(LicenseRtf)" />
+  </Package>
+</Wix>

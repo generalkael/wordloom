@@ -151,3 +151,7 @@ private:
 
 // Registers MarkdownStyler as `import com.wordloom.styling` (called from main).
 void register_styler_types();
+
+// Sets the window and taskbar icon (Windows and X11 show it; macOS uses the
+// bundle's icon and Wayland the .desktop file's).
+void set_app_icon();

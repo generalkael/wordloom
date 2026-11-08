@@ -1,5 +1,8 @@
 //! Wordloom desktop application entry point.
 
+// A release build on Windows is a GUI app: no console window opens with it.
+#![cfg_attr(all(windows, not(debug_assertions)), windows_subsystem = "windows")]
+
 mod controller;
 mod styling;
 
@@ -42,6 +45,7 @@ fn main() {
     }
 
     styling::ffi::register_styler_types();
+    styling::ffi::set_app_icon();
     let mut engine = QQmlApplicationEngine::new();
     if let Some(engine) = engine.as_mut() {
         engine.load(&QUrl::from("qrc:/qt/qml/com/wordloom/app/qml/Main.qml"));
