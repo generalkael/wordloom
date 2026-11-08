@@ -47,6 +47,29 @@ pub struct CompileOptions {
     pub number_chapters: bool,
     /// The look of a PDF.
     pub pdf_style: crate::print::PdfStyle,
+    /// First-line indent of body paragraphs in ems (HTML, EPUB, DOCX, PDF).
+    /// `None` keeps each format's own; 0 means no indent, with space
+    /// between paragraphs instead.
+    pub indent: Option<f64>,
+}
+
+impl CompileOptions {
+    /// The paragraph indent in ems, or `default` when none was chosen.
+    pub(crate) fn indent_or(&self, default: f64) -> f64 {
+        self.indent
+            .filter(|e| e.is_finite())
+            .map_or(default, |e| e.clamp(0.0, 6.0))
+    }
+
+    /// The CSS rule for body paragraphs (HTML and EPUB).
+    pub(crate) fn paragraph_css(&self) -> String {
+        let e = self.indent_or(1.5);
+        if e > 0.0 {
+            format!("p{{margin:0;text-indent:{e}em}}")
+        } else {
+            "p{margin:0 0 1em;text-indent:0}".into()
+        }
+    }
 }
 
 impl Default for CompileOptions {
@@ -60,6 +83,7 @@ impl Default for CompileOptions {
             root: None,
             number_chapters: false,
             pdf_style: Default::default(),
+            indent: None,
         }
     }
 }
@@ -253,7 +277,7 @@ fn render_html(p: &Project, opts: &CompileOptions, pieces: &[Piece]) -> String {
     format!(
         "<!doctype html>\n<html><head><meta charset=\"utf-8\"><title>{}</title>\n<style>\n\
          body{{max-width:38em;margin:3em auto;font:1.1em/1.6 Georgia,serif;padding:0 1em}}\n\
-         p{{margin:0;text-indent:1.5em}} h2+p,h3+p,.sep+p{{text-indent:0}}\n\
+         {} h2+p,h3+p,.sep+p{{text-indent:0}}\n\
          .sep{{text-align:center;margin:1em 0;text-indent:0}}\n\
          .title-page{{text-align:center;margin:30vh 0;page-break-after:always}}\n\
          h2{{page-break-before:always;text-align:center;margin-top:3em}}\n\
@@ -262,6 +286,7 @@ fn render_html(p: &Project, opts: &CompileOptions, pieces: &[Piece]) -> String {
          ol.notes{{font-size:.9em}} ol.notes li{{margin:.4em 0}}\n\
          </style></head><body>\n{}</body></html>\n",
         esc(&p.meta.title),
+        opts.paragraph_css(),
         // One file: the notes are on the same page.
         body.replace(crate::footnotes::NOTES_FILE, "")
     )
@@ -489,6 +514,44 @@ mod tests {
         );
         assert!(txt.contains("CHAPTER 1: CHAPTER 1"));
         assert!(txt.contains("Second scene."));
+    }
+
+    #[test]
+    fn paragraph_indent() {
+        use crate::print::{print_html, PdfStyle};
+        let mut p = sample();
+        let ch = p.nodes[&p.root(RootRole::Manuscript)].children[0];
+        let s1 = p.nodes[&ch].children[0];
+        p.set_text(s1, "One.\n\nTwo.".into()).unwrap(); // Two is indented
+        let with = |format, indent| CompileOptions {
+            format,
+            indent,
+            ..Default::default()
+        };
+        // Archives are stored uncompressed, so their text can be searched.
+        let file = |o: CompileOptions| String::from_utf8_lossy(&compile_file(&p, &o)).into_owned();
+        // Each format keeps its own indent by default.
+        assert!(compile(&p, &with(Format::Html, None)).contains("p{margin:0;text-indent:1.5em}"));
+        assert!(file(with(Format::Docx, None)).contains("w:firstLine=\"432\""));
+        assert!(
+            print_html(&p, &with(Format::Pdf, None), PdfStyle::Book).contains("text-indent:24px")
+        );
+        // A chosen indent, in ems (DOCX: twentieths of a 12 pt em; PDF: 16 px).
+        assert!(compile(&p, &with(Format::Html, Some(2.0))).contains("p{margin:0;text-indent:2em}"));
+        assert!(file(with(Format::Epub, Some(3.0))).contains("p{margin:0;text-indent:3em}"));
+        assert!(file(with(Format::Docx, Some(1.0))).contains("w:firstLine=\"240\""));
+        assert!(
+            print_html(&p, &with(Format::Pdf, Some(2.0)), PdfStyle::Book)
+                .contains("text-indent:32px")
+        );
+        // None: space between paragraphs instead.
+        assert!(
+            compile(&p, &with(Format::Html, Some(0.0))).contains("p{margin:0 0 1em;text-indent:0}")
+        );
+        assert!(file(with(Format::Docx, Some(0.0)))
+            .contains("<w:spacing w:after=\"240\"/><w:ind w:firstLine=\"0\"/>"));
+        let flat = print_html(&p, &with(Format::Pdf, Some(0.0)), PdfStyle::Manuscript);
+        assert!(!flat.contains("text-indent:48px") && flat.contains("margin-bottom:28px"));
     }
 
     #[test]

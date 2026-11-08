@@ -31,6 +31,15 @@ Dialog {
         property alias font: fontBox.currentIndex
         property alias contact: contactField.text
     }
+    Settings {
+        category: "compile"
+        property alias indent: indentBox.currentIndex
+    }
+    // Paragraph indent choices, in ems; null keeps the format's own
+    // (1.5 em for HTML and EPUB, about 1.8 em in DOCX, 1.5 em for a book PDF
+    // and half an inch for a manuscript); 0 spaces paragraphs instead.
+    readonly property var indents: [null, Theme.firstLineIndent, 0, 1, 1.5, 2, 3]
+    readonly property bool hasIndent: ["html", "epub", "docx", "pdf"].indexOf(formats[formatBox.currentIndex]) >= 0
     PdfExporter { id: exporter }
     // "Quinn" from "Mara Quinn"; the header's short title ("Lighthouse
     // Keeper" from "The Lighthouse Keeper: A Novel").
@@ -64,10 +73,12 @@ Dialog {
             document_titles: docTitles.checked,
             number_chapters: numberChapters.checked,
             scene_separator: sepField.text,
-            pdf_style: pdfStyle.currentIndex === 1 ? "manuscript" : "book"
+            pdf_style: pdfStyle.currentIndex === 1 ? "manuscript" : "book",
+            indent: indents[Math.max(0, indentBox.currentIndex)]
         };
     }
     // For --selftest.
+    function setIndent(i) { indentBox.currentIndex = i; refresh(); }
     function selectFormat(f, style) { formatBox.currentIndex = formats.indexOf(f); if (style !== undefined) pdfStyle.currentIndex = style; refresh(); }
     function refresh() { preview.text = Api.get("compile", "", options()); }
     onAboutToShow: refresh()
@@ -129,6 +140,22 @@ Dialog {
             CheckBox { id: docTitles; text: qsTr("Document titles as scene headings"); onToggled: dlg.refresh() }
             Label { text: qsTr("Scene separator") }
             TextField { id: sepField; Layout.fillWidth: true; text: "* * *"; onEditingFinished: dlg.refresh() }
+            Label { text: qsTr("Paragraph indent"); visible: dlg.hasIndent }
+            ComboBox {
+                id: indentBox
+                visible: dlg.hasIndent
+                Layout.fillWidth: true
+                model: [qsTr("Format's default"), qsTr("Same as editor"), qsTr("None, space between paragraphs"),
+                    qsTr("1 em"), qsTr("1.5 em"), qsTr("2 em"), qsTr("3 em")]
+                // The editor's indent can change, so it's shown, not listed.
+                displayText: currentIndex === 1
+                    ? (Theme.firstLineIndent > 0 ? qsTr("Same as editor (%1 em)").arg(Theme.firstLineIndent) : qsTr("Same as editor (none)"))
+                    : currentText
+                onActivated: dlg.refresh()
+                ToolTip.visible: hovered
+                ToolTip.delay: 600
+                ToolTip.text: qsTr("The first-line indent of body paragraphs. The first paragraph after a heading or scene break is never indented, except in a manuscript.")
+            }
             Label {
                 Layout.fillWidth: true
                 wrapMode: Text.Wrap

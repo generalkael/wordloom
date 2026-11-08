@@ -10,6 +10,13 @@ Notable changes to Wordloom. Each entry lands in the same commit as the change i
   *Order Binder by Board* reorders the folder to match the board (rows, left to right). Ctrl+arrows
   nudge the highlighted card. Dropping a card on the middle of a folder card moves it into the
   folder, as on the grid.
+- **Moving several cards at once.** On a freeform board, Ctrl+click cards and notes or drag a box on
+  the empty board to pick them (Ctrl+A picks all, Esc lets go). Drag one to move them all as one
+  undo step, drop them on a folder card to move them in, or Ctrl+arrow to nudge them.
+  *Arrange ▾ ▸ Snap to Grid* lines cards up on a grid.
+- **Paragraph indent in exports.** Compile can set the first-line indent for HTML, EPUB, DOCX and
+  PDF: the format's own (as before), the same as the editor, 1–3 em, or none with space between
+  paragraphs.
 - Ctrl+scroll on the corkboard resizes the cards, and the card size is now remembered between runs.
 - **Corkboard notes.** *+ Note* (or double-click a freeform board) pins a sticky note that lives
   only on that board, not in the binder, with a title, text and one of five colours. *Make into
@@ -185,6 +192,7 @@ Notable changes to Wordloom. Each entry lands in the same commit as the change i
   `Cargo.lock`), as Flathub requires, and the AppStream metadata has screenshots.
 
 ### Fixed
+- On a freeform corkboard, undoing a card move left the card drawn where it had been dropped.
 - **Split editor follows focus.** Picking a document in the binder always replaced the main
   editor's document, even while you were writing in the split editor. It now opens in the pane
   you were last typing in (shown by an accent line on its header), and the binder highlight,

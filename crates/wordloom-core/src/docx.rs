@@ -43,7 +43,7 @@ const STYLES: &str = r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <w:rPrDefault><w:rPr><w:rFonts w:ascii="Georgia" w:hAnsi="Georgia" w:eastAsia="Georgia" w:cs="Georgia"/><w:sz w:val="24"/><w:szCs w:val="24"/><w:lang w:val="en-US"/></w:rPr></w:rPrDefault>
 <w:pPrDefault><w:pPr><w:spacing w:after="0" w:line="360" w:lineRule="auto"/></w:pPr></w:pPrDefault>
 </w:docDefaults>
-<w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/><w:qFormat/><w:pPr><w:ind w:firstLine="432"/></w:pPr></w:style>
+<w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/><w:qFormat/><w:pPr>{NORMAL}</w:pPr></w:style>
 <w:style w:type="paragraph" w:styleId="FirstParagraph"><w:name w:val="First Paragraph"/><w:basedOn w:val="Normal"/><w:next w:val="Normal"/><w:qFormat/><w:pPr><w:ind w:firstLine="0"/></w:pPr></w:style>
 <w:style w:type="paragraph" w:styleId="Title"><w:name w:val="Title"/><w:basedOn w:val="Normal"/><w:next w:val="Subtitle"/><w:qFormat/><w:pPr><w:spacing w:before="4320" w:after="480"/><w:ind w:firstLine="0"/><w:jc w:val="center"/></w:pPr><w:rPr><w:sz w:val="56"/><w:szCs w:val="56"/></w:rPr></w:style>
 <w:style w:type="paragraph" w:styleId="Subtitle"><w:name w:val="Subtitle"/><w:basedOn w:val="Normal"/><w:next w:val="Normal"/><w:qFormat/><w:pPr><w:ind w:firstLine="0"/><w:jc w:val="center"/></w:pPr><w:rPr><w:sz w:val="28"/><w:szCs w:val="28"/></w:rPr></w:style>
@@ -56,6 +56,18 @@ const STYLES: &str = r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <w:style w:type="character" w:styleId="FootnoteReference"><w:name w:val="footnote reference"/><w:rPr><w:vertAlign w:val="superscript"/></w:rPr></w:style>
 </w:styles>
 "#;
+
+/// The styles, with the Normal paragraph's indent from the options (an em
+/// is 12 pt here; 0 gives space after each paragraph instead).
+fn styles(opts: &CompileOptions) -> String {
+    let e = opts.indent_or(1.8);
+    let normal = if e > 0.0 {
+        format!("<w:ind w:firstLine=\"{}\"/>", (e * 240.0).round() as i64)
+    } else {
+        "<w:spacing w:after=\"240\"/><w:ind w:firstLine=\"0\"/>".to_string()
+    };
+    STYLES.replace("{NORMAL}", &normal)
+}
 
 pub(crate) fn build(p: &Project, opts: &CompileOptions, pieces: &[Piece]) -> Vec<u8> {
     let mut body = Body::default();
@@ -130,7 +142,7 @@ pub(crate) fn build(p: &Project, opts: &CompileOptions, pieces: &[Piece]) -> Vec
     z.add("_rels/.rels", RELS.as_bytes());
     z.add("docProps/core.xml", core.as_bytes());
     z.add("word/_rels/document.xml.rels", DOC_RELS.as_bytes());
-    z.add("word/styles.xml", STYLES.as_bytes());
+    z.add("word/styles.xml", styles(opts).as_bytes());
     z.add("word/document.xml", document.as_bytes());
     z.add("word/footnotes.xml", footnotes_xml(notes).as_bytes());
     z.finish()

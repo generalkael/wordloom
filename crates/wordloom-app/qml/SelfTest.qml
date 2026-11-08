@@ -12,6 +12,7 @@ Item {
     property var sprint                  // SprintDialog
     property var analysis                // AnalysisDialog
     property var compile                 // CompileDialog
+    property var groupStart: null        // spots before a group drag (freeform groups)
     property var goTo                    // GoToPopup
     property var autoBackup              // Main.qml's Automatic Backups dialog
     property var grid                    // PresenceDialog
@@ -368,6 +369,20 @@ Item {
             check(longPdf.ok && longPdf.pages >= ms.pages + 10, "a long chapter continues over many pages (" + longPdf.pages + ")");
             compile.selectFormat("markdown", 0);
         }],
+        ["compile indent", () => {
+            compile.selectFormat("html", 0);
+            compile.setIndent(5);
+            check(compile.options().indent === 2 && Api.get("compile", "", compile.options()).indexOf("p{margin:0;text-indent:2em}") >= 0, "a chosen paragraph indent reaches the export");
+            Theme.firstLineIndent = 1;
+            compile.setIndent(1);
+            check(compile.options().indent === 1, "Same as editor uses the editor's indent (" + compile.options().indent + ")");
+            Theme.firstLineIndent = 0;
+            compile.setIndent(2);
+            check(Api.get("compile", "", compile.options()).indexOf("p{margin:0 0 1em;text-indent:0}") >= 0, "None spaces the paragraphs instead");
+            compile.setIndent(0);
+            check(compile.options().indent === null, "the format's default sends no indent");
+            compile.selectFormat("markdown", 0);
+        }],
         ["import manuscript", () => {
             // Round trip: export the manuscript as Markdown, import it back.
             const meta = Api.get("meta", null), dir = meta.path.substring(0, meta.path.lastIndexOf("/"));
@@ -575,6 +590,57 @@ Item {
             check(c.cardWidth === w + 20 && Theme.cardWidth === w + 20, "Ctrl+scroll makes the cards bigger (" + w + " → " + c.cardWidth + ")");
             c.zoomWheel({ angleDelta: { y: -120 }, accepted: false });
             check(c.cardWidth === w, "and smaller again");
+            c.setFreeform(false);
+        }],
+        ["freeform groups", () => {
+            ws().select(Api.call("rootId", "manuscript"), "corkboard");
+            ws().corkboardRef().setFreeform(true);
+        }],
+        ["freeform groups", () => {
+            const c = ws().corkboardRef(), log = rowId("The Log"), ret = rowId("The Return");
+            c.picked = []; c.keyId = log; c.focusBoard();
+            c.tapCard(ret, Qt.ControlModifier);
+            check(c.picked.length === 2 && c.isPicked(log) && c.isPicked(ret), "Ctrl+click picks a second card with the highlighted one (" + c.picked.length + ")");
+            const from = c.cardGrip(c.items.findIndex(x => x.id === log));
+            groupStart = { log: c.spots[log], ret: c.spots[ret] };
+            if (from) input.drag(win, from, Qt.point(from.x + 60, from.y + 300));
+        }],
+        ["freeform groups", () => {
+            const c = ws().corkboardRef(), log = rowId("The Log"), ret = rowId("The Return");
+            const dl = c.spots[log].y - groupStart.log.y, dr = c.spots[ret].y - groupStart.ret.y;
+            const xl = c.spots[log].x - groupStart.log.x, xr = c.spots[ret].x - groupStart.ret.x;
+            check(dl > 100 && Math.abs(dl - dr) < 0.5 && Math.abs(xl - xr) < 0.5, "dragging one picked card moves them all together (" + [dl, dr, xl, xr].map(v => v.toFixed(1)) + ")");
+            check(c.groupLead === "" && c.groupDx === 0, "and the drag is over");
+            check(Api.call("undo") === "Move 2 on Corkboard" && Math.abs(c.spots[ret].y - groupStart.ret.y) < 0.5, "one Undo puts both back");
+            const vis = (id) => c.cardItem(id).parent.y - c.toView(c.spots[id].y);
+            check(Math.abs(vis(log)) < 1 && Math.abs(vis(ret)) < 1, "and they show where they are, the one dragged too (" + vis(log) + ", " + vis(ret) + ")");
+            c.handleKey({ key: Qt.Key_Escape, modifiers: 0 });
+            check(c.picked.length === 0, "Esc unpicks them");
+            c.handleKey({ key: Qt.Key_A, modifiers: Qt.ControlModifier });
+            check(c.picked.length === c.items.length, "Ctrl+A picks everything on the board");
+            c.picked = [];
+            // A box dragged from the empty board over the first card.
+            let maxY = 0; for (const id in c.spots) maxY = Math.max(maxY, c.spots[id].y);
+            const first = c.freeOrder[0], p = c.spots[first.id];
+            const from = c.boardPoint(c.toView(p.x) + 4, c.toView(maxY) + c.cardHeight + 20), to = c.boardPoint(c.toView(p.x) + 30, c.toView(p.y) + 30);
+            input.drag(win, from, to);
+            check(c.isPicked(first.id) && c.picked.length >= 1, "dragging a box on the empty board picks the cards in it (" + c.picked.length + ")");
+            Theme.boardSnap = true;
+            c.placeAt(first.id, c.toView(53), c.toView(87));
+            check(c.spots[first.id].x === 60 && c.spots[first.id].y === 80, "Snap to Grid puts a dropped card on the grid (" + JSON.stringify(c.spots[first.id]) + ")");
+            Theme.boardSnap = false;
+            Api.call("undo");
+            c.picked = [log, ret];
+        }],
+        ["freeform groups", () => {
+            const c = ws().corkboardRef(), storm = c.items.findIndex(x => x.title === "The Storm");
+            const from = c.cardGrip(c.items.findIndex(x => x.id === rowId("The Log"))), to = c.cardPoint(storm, 0.5);
+            if (from && to) input.drag(win, from, to);
+        }],
+        ["freeform groups", () => {
+            const c = ws().corkboardRef(), inStorm = Api.get("children", [], rowId("The Storm")).map(x => x.title);
+            check(inStorm.indexOf("The Log") >= 0 && inStorm.indexOf("The Return") >= 0, "dropping the group on a folder card moves them all in (" + inStorm + ")");
+            check(Api.call("undo") === "Move 2 Items" && c.cards.some(x => x.title === "The Log"), "one Undo brings them back");
             c.setFreeform(false);
         }],
         ["grid notes", () => {

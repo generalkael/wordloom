@@ -1436,6 +1436,82 @@ impl Session {
         Ok(())
     }
 
+    /// Move several cards and notes on a freeform board at once, given as
+    /// (id, x, y): one undo step for a group drag.
+    pub fn place_many_on_board(
+        &mut self,
+        container: &str,
+        spots: &[(String, f64, f64)],
+    ) -> Result<()> {
+        let cid = parse_id(container)?;
+        let children = self.project.node(cid)?.children.clone();
+        let parsed = spots
+            .iter()
+            .map(|(id, x, y)| Ok((parse_id(id)?, *x, *y)))
+            .collect::<Result<Vec<_>>>()?;
+        // Check them all first, so a bad id moves nothing.
+        let notes: Vec<Uuid> = self
+            .project
+            .boards
+            .board(cid)
+            .map_or(Vec::new(), |b| b.notes.iter().map(|n| n.id).collect());
+        if let Some((bad, ..)) = parsed
+            .iter()
+            .find(|(id, ..)| !children.contains(id) && !notes.contains(id))
+        {
+            return Err(Error::NoSuchNode(*bad));
+        }
+        if parsed
+            .iter()
+            .any(|(_, x, y)| !x.is_finite() || !y.is_finite())
+        {
+            return Err(Error::Invalid("not a place on the board".into()));
+        }
+        for (id, x, y) in parsed {
+            if children.contains(&id) {
+                self.project.boards.place(cid, id, x, y)?;
+            } else {
+                self.project.boards.move_note(cid, id, x, y)?;
+            }
+        }
+        self.changed();
+        Ok(())
+    }
+
+    /// Drop several cards and notes from a board onto a folder card: the
+    /// cards move into the folder (in binder order), the notes onto its board.
+    pub fn drop_on_board_folder(
+        &mut self,
+        container: &str,
+        ids: &[String],
+        folder: &str,
+    ) -> Result<()> {
+        let (cid, fid) = (parse_id(container)?, parse_id(folder)?);
+        let children = self.project.node(cid)?.children.clone();
+        self.project.node(fid)?;
+        let mut cards = Vec::new();
+        let mut notes = Vec::new();
+        for id in ids {
+            let u = parse_id(id)?;
+            if u == fid {
+                continue;
+            }
+            if children.contains(&u) {
+                cards.push(id.clone());
+            } else {
+                notes.push(u);
+            }
+        }
+        if !cards.is_empty() {
+            self.move_many(&cards, folder, "inside")?;
+        }
+        for n in notes {
+            self.project.boards.relocate_note(cid, n, fid, usize::MAX)?;
+        }
+        self.changed();
+        Ok(())
+    }
+
     pub fn tidy_board(&mut self, container: &str) -> Result<()> {
         let cid = parse_id(container)?;
         self.project.node(cid)?;

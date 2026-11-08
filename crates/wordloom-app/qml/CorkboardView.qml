@@ -80,6 +80,7 @@ Rectangle {
             // A leaf: show it among its siblings.
             cid = parentOf(node.id);
         }
+        if ((cid || "") !== containerId) picked = [];
         containerId = cid || "";
         const info = containerId ? Api.get("nodeInfo", null, containerId) : null;
         containerTitle = info ? info.title : "";
@@ -88,6 +89,7 @@ Rectangle {
         board = b;
         cards = c;
         items = c.concat(b.notes.map(n => Object.assign({ note: true }, n)));
+        picked = picked.filter(id => items.some(it => it.id === id));
     }
 
     // ---- freeform layout. Positions are in board units: pixels at the
@@ -135,10 +137,10 @@ Rectangle {
     function toView(u) { return margin + u * unit; }
     function toUnits(px) { return Math.max(0, (px - margin) / unit); }
     // The card or note at a point of the freeform view's content, or "".
-    // `skip`: an id to look through (the card being dragged).
+    // `skip`: an id, or a list of ids, to look through (what's being dragged).
     function idAtBoard(px, py, skip) {
-        const x = toUnits(px), y = toUnits(py);
-        const hit = freeOrder.slice().reverse().find(it => { const p = spots[it.id]; return it.id !== skip && p && x >= p.x && x <= p.x + baseW && y >= p.y && y <= p.y + baseH; });
+        const x = toUnits(px), y = toUnits(py), skips = Array.isArray(skip) ? skip : [skip];
+        const hit = freeOrder.slice().reverse().find(it => { const p = spots[it.id]; return skips.indexOf(it.id) < 0 && p && x >= p.x && x <= p.x + baseW && y >= p.y && y <= p.y + baseH; });
         return hit ? hit.id : "";
     }
     // Freeform: while a card is dragged over the middle of a folder card,
@@ -146,7 +148,7 @@ Rectangle {
     property string freeDropFolder: ""
     function updateFreeDrag(id, scenePos) {
         const p = freeContent.mapFromItem(null, scenePos.x, scenePos.y);
-        const under = idAtBoard(p.x, p.y, id);
+        const under = idAtBoard(p.x, p.y, groupLead === id ? picked : id);
         const card = under ? cards.find(c => c.id === under) : null;
         const fx = card ? (toUnits(p.x) - spots[under].x) / baseW : 0;
         freeDropFolder = card && card.kind === "folder" && fx > 0.3 && fx < 0.7 ? under : "";
@@ -156,17 +158,87 @@ Rectangle {
     function finishFreeDrag(id, px, py) {
         const folder = freeDropFolder;
         freeDropFolder = "";
+        if (groupLead === id) {
+            lastLead = id;
+            groupLead = ""; groupDx = 0; groupDy = 0;
+            if (folder) return Api.call("dropOnBoardFolder", containerId, picked, folder) !== undefined;
+            return moveGroup(px - toView(spots[id].x), py - toView(spots[id].y));
+        }
         const note = !cards.some(c => c.id === id);
         if (folder && note) return Api.call("moveBoardNote", containerId, id, folder, 1e6) !== undefined;
         if (folder) return Api.call("dropOn", id, folder, "inside") !== undefined;
         return placeAt(id, px, py);
     }
-    function placeAt(id, px, py) { return Api.call("placeOnBoard", containerId, id, toUnits(px), toUnits(py)) !== undefined; }
+    function placeAt(id, px, py) { return Api.call("placeOnBoard", containerId, id, snap(toUnits(px)), snap(toUnits(py))) !== undefined; }
+
+    // ---- several at once (freeform): Ctrl+click picks and unpicks cards
+    // and notes, dragging on the empty board picks those inside the box
+    // (Ctrl adds to them). Dragging one of them moves them all.
+    property var picked: []
+    function isPicked(id) { return picked.indexOf(id) >= 0; }
+    function togglePick(id) {
+        // The highlighted card (if the board has the keys) joins the first
+        // time something is added.
+        let p = picked.length === 0 && boardFocused && keyId && keyId !== id ? [keyId] : picked.slice();
+        const i = p.indexOf(id);
+        if (i >= 0) p.splice(i, 1); else p.push(id);
+        picked = p;
+        keyId = id;
+    }
+    // A click on a card or note: Ctrl on a freeform board picks or unpicks
+    // it; otherwise it becomes the one highlighted (and a card selected).
+    function tapCard(id, modifiers, face) {
+        if (freeform && (modifiers & Qt.ControlModifier)) {
+            togglePick(id);
+            focusBoard();
+            return;
+        }
+        if (freeform) picked = [];
+        keyId = id;
+        if (cards.some(c => c.id === id)) selectRequested(id);
+        if (face && face.focusView) face.focusView.forceActiveFocus();
+    }
+    function pickAll() { picked = freeOrder.map(it => it.id); }
+    // The cards and notes touching the box between two points of the
+    // board (pixels), added to `base`.
+    function pickInBox(a, b, base) {
+        const x0 = toUnits(Math.min(a.x, b.x)), x1 = toUnits(Math.max(a.x, b.x));
+        const y0 = toUnits(Math.min(a.y, b.y)), y1 = toUnits(Math.max(a.y, b.y));
+        const inside = freeOrder.filter(it => { const p = spots[it.id]; return p.x <= x1 && p.x + baseW >= x0 && p.y <= y1 && p.y + baseH >= y0; }).map(it => it.id);
+        picked = base.concat(inside.filter(id => base.indexOf(id) < 0));
+        if (inside.length) keyId = inside[0];
+    }
+    // While a picked card is dragged: it, and how far it has gone (pixels),
+    // so the others follow.
+    property string groupLead: ""
+    property real groupDx: 0
+    property real groupDy: 0
+    function startGroupDrag(id) { if (picked.length > 1 && isPicked(id)) groupLead = id; }
+    // Move every picked card and note by (dx, dy) pixels, as one undo
+    // step; none goes past the board's top or left edge. With Snap to Grid
+    // the one dragged lands on the grid and the rest keep their places
+    // around it.
+    function moveGroup(dx, dy) {
+        const ids = picked.filter(id => spots[id]);
+        if (!ids.length) return false;
+        let du = dx / unit, dv = dy / unit;
+        const lead = spots[groupLeadFor(ids)];
+        du = snap(lead.x + du) - lead.x; dv = snap(lead.y + dv) - lead.y;
+        du = Math.max(du, -Math.min(...ids.map(id => spots[id].x)));
+        dv = Math.max(dv, -Math.min(...ids.map(id => spots[id].y)));
+        if (Math.abs(du) < 0.01 && Math.abs(dv) < 0.01) return false;
+        return Api.call("placeManyOnBoard", containerId, ids.map(id => [id, spots[id].x + du, spots[id].y + dv])) !== undefined;
+    }
+    property string lastLead: ""
+    function groupLeadFor(ids) { return ids.indexOf(lastLead) >= 0 ? lastLead : (ids.indexOf(keyId) >= 0 ? keyId : ids[0]); }
+    // Snap to Grid (Arrange menu): board units onto a 20-unit grid.
+    readonly property int gridStep: 20
+    function snap(u) { return Theme.boardSnap ? Math.round(u / gridStep) * gridStep : u; }
     // Add a note; in freeform at (x, y) units, else (or with no spot) in the
     // first free slot. Returns its id and focuses its text.
     function addNote(at) {
         if (!containerId) return "";
-        const p = at || nextFreeSpot();
+        const p = at ? { x: snap(at.x), y: snap(at.y) } : nextFreeSpot();
         const id = Api.call("addBoardNote", containerId, p.x, p.y, "");
         // The board has already reloaded (the call bumps the revision).
         if (id) { keyId = id; Qt.callLater(() => { const f = noteEditor(id); if (f) f.forceActiveFocus(); }); }
@@ -278,11 +350,16 @@ Rectangle {
         if (arrow >= 0) {
             if (freeform) {
                 if (ctrl) {
-                    // Nudge the card or note a little.
-                    if (it && spots[it.id]) {
+                    // Nudge the card or note a little (all of them, when
+                    // several are picked).
+                    if (it && picked.length > 1 && isPicked(it.id)) {
+                        const d = 20 * unit;
+                        lastLead = it.id;
+                        moveGroup([-d, d, 0, 0][arrow], [0, 0, -d, d][arrow]);
+                    } else if (it && spots[it.id]) {
                         const p = spots[it.id], d = 20;
                         const dx = [-d, d, 0, 0][arrow], dy = [0, 0, -d, d][arrow];
-                        Api.call("placeOnBoard", containerId, it.id, Math.max(0, p.x + dx), Math.max(0, p.y + dy));
+                        Api.call("placeOnBoard", containerId, it.id, Math.max(0, snap(p.x + dx)), Math.max(0, snap(p.y + dy)));
                     }
                 } else {
                     const order = freeOrder, k = order.findIndex(c => c.id === keyId);
@@ -297,6 +374,8 @@ Rectangle {
             else highlight(i < 0 ? 0 : i + step);
             return true;
         }
+        if (freeform && e.key === Qt.Key_Escape && picked.length) { picked = []; return true; }
+        if (freeform && e.key === Qt.Key_A && ctrl) { pickAll(); return true; }
         if (e.key === Qt.Key_Home) { highlight(0); return true; }
         if (e.key === Qt.Key_End) { highlight(items.length - 1); return true; }
         if ((e.key === Qt.Key_Return || e.key === Qt.Key_Enter) && it) {
@@ -337,6 +416,8 @@ Rectangle {
     // window coordinates: where a real drag can start.
     function cardGrip(i) { const it = i >= 0 && i < items.length ? cardItem(items[i].id) : null; return it ? it.mapToItem(null, 4, it.height / 2) : null; }
     // A point on card `i` (fraction `fx` across it), in window coordinates.
+    // A point of the freeform board (pixels), in window coordinates.
+    function boardPoint(px, py) { return freeContent.mapToItem(null, px, py); }
     function cardPoint(i, fx) { const it = i >= 0 && i < items.length ? cardItem(items[i].id) : null; return it ? it.mapToItem(null, it.width * fx, it.height / 2) : null; }
     // Returns true if the card moved.
     function finishDrag() {
@@ -407,6 +488,9 @@ Rectangle {
         id: arrangeMenu
         MenuItem { text: qsTr("Tidy Up"); onTriggered: Api.call("tidyBoard", cb.containerId) }
         MenuItem { text: qsTr("Order Binder by Board"); onTriggered: cb.orderBinder() }
+        MenuSeparator {}
+        MenuItem { text: qsTr("Snap to Grid"); checkable: true; checked: Theme.boardSnap; onTriggered: Theme.boardSnap = !Theme.boardSnap }
+        MenuItem { text: qsTr("Select All (Ctrl+A)"); onTriggered: { cb.pickAll(); cb.focusBoard(); } }
     }
     // Right-click on the empty board.
     Menu {
@@ -424,7 +508,7 @@ Rectangle {
     function addCard(at) {
         const id = Api.call("add", containerId, "", "", true);
         if (!id) return "";
-        if (at) Api.call("placeOnBoard", containerId, id, at.x, at.y);
+        if (at) Api.call("placeOnBoard", containerId, id, snap(at.x), snap(at.y));
         selectRequested(id);
         return id;
     }
@@ -606,6 +690,38 @@ Rectangle {
                         boardMenu.popup();
                     }
                 }
+                // Drag on the empty board: pick what's inside the box.
+                HoverHandler { id: boardHover }
+                DragHandler {
+                    id: bandDrag
+                    target: null
+                    // Only from the empty board (where the pointer last was
+                    // before the press), so cards keep their own drags.
+                    enabled: active || !cb.idAtBoard(boardHover.point.position.x, boardHover.point.position.y)
+                    acceptedButtons: Qt.LeftButton
+                    property bool live: false
+                    property var base: []
+                    onActiveChanged: {
+                        if (active) {
+                            const p = centroid.pressPosition;
+                            live = !cb.idAtBoard(p.x, p.y);
+                            base = live && (centroid.modifiers & Qt.ControlModifier) ? cb.picked.slice() : [];
+                            if (live) freeView.forceActiveFocus();
+                        } else live = false;
+                    }
+                    onCentroidChanged: if (active && live) cb.pickInBox(centroid.pressPosition, centroid.position, base)
+                }
+                Rectangle {
+                    visible: bandDrag.active && bandDrag.live
+                    x: Math.min(bandDrag.centroid.pressPosition.x, bandDrag.centroid.position.x)
+                    y: Math.min(bandDrag.centroid.pressPosition.y, bandDrag.centroid.position.y)
+                    width: Math.abs(bandDrag.centroid.position.x - bandDrag.centroid.pressPosition.x)
+                    height: Math.abs(bandDrag.centroid.position.y - bandDrag.centroid.pressPosition.y)
+                    z: 20
+                    color: Qt.rgba(Theme.accent.r, Theme.accent.g, Theme.accent.b, 0.12)
+                    border.color: Theme.accent
+                    border.width: 1
+                }
 
                 Repeater {
                     id: freeRep
@@ -616,12 +732,20 @@ Rectangle {
                         required property int index
                         property alias face: freeFace
                         readonly property var at: cb.spots[modelData.id] || { x: 0, y: 0 }
-                        x: cb.toView(at.x)
-                        y: cb.toView(at.y)
+                        // Picked ones follow the one being dragged.
+                        readonly property bool follows: cb.groupLead !== "" && cb.groupLead !== modelData.id && cb.isPicked(modelData.id)
+                        x: cb.toView(at.x) + (follows ? cb.groupDx : 0)
+                        y: cb.toView(at.y) + (follows ? cb.groupDy : 0)
+                        // Dragging sets x and y directly; afterwards they
+                        // follow the board again (so Undo moves it back).
+                        function rebind() {
+                            x = Qt.binding(() => cb.toView(at.x) + (follows ? cb.groupDx : 0));
+                            y = Qt.binding(() => cb.toView(at.y) + (follows ? cb.groupDy : 0));
+                        }
                         width: cb.cardWidth
                         height: cb.cardHeight
                         // The one being moved, and the highlighted one, on top.
-                        z: freeFace.moving ? 10 : cb.keyId === modelData.id ? 2 : 1
+                        z: freeFace.moving ? 10 : follows ? 9 : cb.keyId === modelData.id ? 2 : 1
                         CardFace {
                             id: freeFace
                             anchors.fill: parent
@@ -747,11 +871,7 @@ Rectangle {
 
         TapHandler {
             acceptedButtons: Qt.LeftButton
-            onTapped: {
-                cb.keyId = face.modelData.id;
-                if (!face.isNote) cb.selectRequested(face.modelData.id);
-                if (face.focusView) face.focusView.forceActiveFocus();
-            }
+            onTapped: cb.tapCard(face.modelData.id, point.modifiers, face)
             onDoubleTapped: { if (face.isNote) synopsis.forceActiveFocus(); else cb.openRequested(face.modelData.id); }
         }
         TapHandler { acceptedButtons: Qt.RightButton; onTapped: { cb.keyId = face.modelData.id; (face.isNote ? noteMenu : cardMenu).popup(); } }
@@ -767,15 +887,24 @@ Rectangle {
             yAxis.minimum: 0
             onActiveChanged: {
                 if (face.mover) {
-                    if (active) { cb.keyId = face.modelData.id; return; }
-                    cb.finishFreeDrag(face.modelData.id, face.mover.x, face.mover.y);
+                    if (active) { cb.keyId = face.modelData.id; cb.startGroupDrag(face.modelData.id); return; }
+                    const m = face.mover;
+                    cb.finishFreeDrag(face.modelData.id, m.x, m.y);
+                    if (m) m.rebind();
                 } else if (active) cb.startDrag(face.modelData.id, face.modelData.title || (face.isNote ? (face.modelData.text.split("\n")[0] || qsTr("Note")) : ""));
                 else cb.finishDrag();
             }
             onCentroidChanged: {
                 if (!active) return;
                 if (!face.mover) cb.updateDrag(centroid.scenePosition);
-                else cb.updateFreeDrag(face.modelData.id, centroid.scenePosition);
+                else {
+                    if (cb.groupLead === face.modelData.id) {
+                        const at = cb.spots[face.modelData.id];
+                        cb.groupDx = face.mover.x - cb.toView(at.x);
+                        cb.groupDy = face.mover.y - cb.toView(at.y);
+                    }
+                    cb.updateFreeDrag(face.modelData.id, centroid.scenePosition);
+                }
             }
         }
         // The keyboard highlight.
@@ -787,6 +916,15 @@ Rectangle {
             border.width: 2
             border.color: Theme.accent
             radius: 5
+        }
+        // Picked (freeform, several at once).
+        Rectangle {
+            anchors.fill: parent
+            visible: !!face.mover && cb.isPicked(face.modelData.id)
+            color: Qt.rgba(Theme.accent.r, Theme.accent.g, Theme.accent.b, 0.14)
+            border.width: 2
+            border.color: Theme.accent
+            radius: 3
         }
         // "Drop inside this folder" highlight.
         Rectangle {

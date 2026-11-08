@@ -57,6 +57,8 @@ QtObject {
     readonly property string zoomText: Math.round(editorZoom * 100) + "%"
     // Corkboard card width (the Card size slider, Ctrl+scroll on a board).
     property int cardWidth: 230
+    // Freeform corkboards: drop cards and notes on a 20-unit grid.
+    property bool boardSnap: false
     // Show Markdown styling (bold, headings, quotes…) while editing.
     property bool styledMarkdown: true
     // Underline misspelled words in the editor.
@@ -84,6 +86,7 @@ QtObject {
         property alias blankLineHeight: theme.blankLineHeight
         property alias editorZoom: theme.editorZoom
         property alias cardWidth: theme.cardWidth
+        property alias boardSnap: theme.boardSnap
         property alias styledMarkdown: theme.styledMarkdown
         property alias spellCheck: theme.spellCheck
         property alias spellLanguage: theme.spellLanguage

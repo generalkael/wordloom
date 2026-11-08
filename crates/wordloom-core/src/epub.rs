@@ -9,7 +9,6 @@ use crate::zip::ZipWriter;
 
 const CSS: &str = "\
 body{font-family:Georgia,serif;line-height:1.5;margin:0 5%}
-p{margin:0;text-indent:1.5em}
 h2+p,h3+p,h4+p,h5+p,h6+p,.sep+p,blockquote+p{text-indent:0}
 h2{text-align:center;margin:3em 0 2em}
 h3,h4,h5,h6{margin:2em 0 1em}
@@ -55,7 +54,8 @@ pub(crate) fn build(p: &Project, opts: &CompileOptions, pieces: &[Piece]) -> Vec
 </container>
 "#,
     );
-    z.add("OEBPS/style.css", CSS.as_bytes());
+    let css = format!("{}\n{CSS}", opts.paragraph_css());
+    z.add("OEBPS/style.css", css.as_bytes());
 
     // (manifest id, file name, nav label)
     let mut files: Vec<(String, String, String)> = Vec::new();

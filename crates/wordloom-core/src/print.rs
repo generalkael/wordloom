@@ -63,12 +63,35 @@ const MANUSCRIPT: Look = Look {
     quote: "margin-top:0;margin-bottom:0;margin-left:48px;margin-right:48px;text-indent:0;line-height:200%",
 };
 
+/// The body paragraph styles (any, and the first after a heading), with
+/// the indent from the options: an em is 16 px here, so the defaults are
+/// 1.5 em for a book and 3 em (half an inch) for a manuscript. No indent
+/// puts a blank line's space between paragraphs instead.
+fn paragraph_styles(look: &Look, style: PdfStyle, opts: &CompileOptions) -> (String, String) {
+    let (default_px, line_px) = match style {
+        PdfStyle::Book => (24, 14),
+        PdfStyle::Manuscript => (48, 28),
+    };
+    let px = (opts.indent_or(default_px as f64 / 16.0) * 16.0).round() as i64;
+    let from = format!("text-indent:{default_px}px");
+    let adjust = |s: &str| {
+        if px > 0 {
+            s.replace(&from, &format!("text-indent:{px}px"))
+        } else {
+            s.replace(&from, "text-indent:0")
+                .replace("margin-bottom:0", &format!("margin-bottom:{line_px}px"))
+        }
+    };
+    (adjust(look.para), adjust(look.first))
+}
+
 /// The body of the paged document. The title page is drawn by the app.
 pub fn print_html(p: &Project, opts: &CompileOptions, style: PdfStyle) -> String {
     let look = match style {
         PdfStyle::Book => &BOOK,
         PdfStyle::Manuscript => &MANUSCRIPT,
     };
+    let (para, first_para) = paragraph_styles(look, style, opts);
     let mut body = String::new();
     // Paragraphs after a heading or scene break aren't indented (in Book
     // style; manuscripts indent every paragraph).
@@ -139,7 +162,7 @@ pub fn print_html(p: &Project, opts: &CompileOptions, style: PdfStyle) -> String
                             first = true;
                         }
                         Block::Para(t) => {
-                            let st = if first { look.first } else { look.para };
+                            let st = if first { &first_para } else { &para };
                             body.push_str(&format!("<p style=\"{st}\">{}</p>\n", inline_html(&t)));
                             started = true;
                             first = false;

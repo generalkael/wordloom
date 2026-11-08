@@ -193,6 +193,15 @@ fn undo_label(method: &str, a: &Args) -> Option<(String, Option<String>)> {
                 Some(format!("board:{}:{}", a.str(0), a.str(1))),
             ));
         }
+        "placeManyOnBoard" => {
+            let n = a.0.get(1).and_then(Value::as_array).map_or(0, Vec::len);
+            return Some((format!("Move {n} on Corkboard"), None));
+        }
+        "dropOnBoardFolder" => {
+            // The folder itself, if it was in the group, stays.
+            let n = a.strs(1).iter().filter(|id| *id != a.str(2)).count();
+            return Some((format!("Move {n} Items"), None));
+        }
         "updateBoardNote" => {
             return Some(("Edit Note".into(), Some(format!("note:{}", a.str(1)))));
         }
@@ -566,6 +575,31 @@ impl App {
                         .place_on_board(a.str(0), a.str(1), a.float(2), a.float(3)),
                 )?
             }
+            "placeManyOnBoard" => {
+                // [container, [[id, x, y], …]]
+                let spots: Vec<(String, f64, f64)> =
+                    a.0.get(1)
+                        .and_then(Value::as_array)
+                        .map(|v| {
+                            v.iter()
+                                .filter_map(|s| {
+                                    let s = s.as_array()?;
+                                    Some((
+                                        s.first()?.as_str()?.to_string(),
+                                        s.get(1)?.as_f64()?,
+                                        s.get(2)?.as_f64()?,
+                                    ))
+                                })
+                                .collect()
+                        })
+                        .unwrap_or_default();
+                unit(self.s()?.place_many_on_board(a.str(0), &spots))?
+            }
+            "dropOnBoardFolder" => unit(self.s()?.drop_on_board_folder(
+                a.str(0),
+                &a.strs(1),
+                a.str(2),
+            ))?,
             "tidyBoard" => unit(self.s()?.tidy_board(a.str(0)))?,
             "orderChildren" => unit(self.s()?.order_children(a.str(0), &a.strs(1)))?,
             "addBoardNote" => {
@@ -768,6 +802,48 @@ mod tests {
         assert!(board(&mut app)["notes"].as_array().unwrap().is_empty());
         assert_eq!(ok(&app.call("undo", "")), "Make Note a Document");
         assert_eq!(board(&mut app)["notes"][0]["id"], n);
+
+        // A group: several moved at once is one step; a bad id moves none.
+        let n2 = ok(&app.call("addBoardNote", &json!([ms, 0, 0, "Two"]).to_string()));
+        ok(&app.call(
+            "placeManyOnBoard",
+            &json!([ms, [[a, 500, 40], [b, 100, 40], [n2, 300, 300]]]).to_string(),
+        ));
+        assert_eq!(
+            board(&mut app)["positions"][a.as_str().unwrap()],
+            json!([500.0, 40.0])
+        );
+        assert_eq!(board(&mut app)["notes"][1]["x"], 300.0);
+        assert!(app
+            .call(
+                "placeManyOnBoard",
+                &json!([ms, [[a, 1, 1], [ms, 2, 2]]]).to_string()
+            )
+            .json
+            .contains("no item"));
+        assert_eq!(
+            board(&mut app)["positions"][a.as_str().unwrap()],
+            json!([500.0, 40.0])
+        );
+        assert_eq!(ok(&app.call("undo", "")), "Move 3 on Corkboard");
+        assert_eq!(
+            board(&mut app)["positions"][a.as_str().unwrap()],
+            json!([400.0, 10.0])
+        );
+        // Dropped on folder A: B moves into it, the note onto A's board.
+        ok(&app.call("dropOnBoardFolder", &json!([ms, [b, n2, a], a]).to_string()));
+        let in_a = ok(&app.call("children", &json!([a]).to_string()));
+        assert_eq!(in_a[0]["id"], b);
+        assert_eq!(
+            ok(&app.call("board", &json!([a]).to_string()))["notes"][0]["id"],
+            n2
+        );
+        assert_eq!(ok(&app.call("undo", "")), "Move 2 Items");
+        assert!(ok(&app.call("children", &json!([a]).to_string()))
+            .as_array()
+            .unwrap()
+            .is_empty());
+        assert_eq!(board(&mut app)["notes"][1]["id"], n2);
 
         // Undo keeps the board freeform (a view choice).
         ok(&app.call("setBoardFreeform", &json!([ms, false]).to_string()));
