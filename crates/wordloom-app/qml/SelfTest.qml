@@ -15,7 +15,6 @@ Item {
     property string noteId: ""          // the note resized (note resize)
     property var replaceBefore: []        // texts before a project replace
     property var groupStart: null        // spots before a group drag (freeform groups)
-    property var noteAdded: null         // revision and editor right after + Note (freeform corkboard)
     property var goTo                    // GoToPopup
     property var autoBackup              // Main.qml's automatic backups
     property var prefs                   // PreferencesDialog
@@ -577,19 +576,18 @@ Item {
             check(Api.call("undo") === "Move on Corkboard" && c.board.positions[rowId("Arrival")] === undefined, "Undo takes the move back");
             check(c.freeform, "and leaves the board freeform");
             const id = c.addNote(null);
-            // What the check below compares with, if focus is missing on CI.
-            st.noteAdded = { rev: Wordloom.revision, editor: c.noteEditor(id) };
-            Qt.callLater(() => { if (st.noteAdded) st.noteAdded.focused = !!(c.noteEditor(id) && c.noteEditor(id).activeFocus); });
+            // At once, not after a later event: on a slow machine the next
+            // step can run before anything queued now (it did on CI).
+            const ne = c.noteEditor(id);
+            check(ne && ne.activeFocus, "+ Note puts the caret in the new note straight away");
         }],
         ["freeform corkboard", () => {
             const c = ws().corkboardRef(), notes = c.board.notes;
             check(notes.length === 1 && c.items.length === c.cards.length + 1, "+ Note puts a note on the board, not in the binder");
             const ta = c.noteEditor(notes[0].id);
-            const a = st.noteAdded || {}, fi = win.activeFocusItem;
+            const fi = win.activeFocusItem;
             check(ta !== null && ta.activeFocus, "the new note is ready to type in (" + (ta ? "focus " + ta.activeFocus : "no editor")
-                + (ta && ta.activeFocus ? "" : "; same editor " + (ta === a.editor) + ", focused after callLater " + a.focused
-                    + ", revision +" + (Wordloom.revision - a.rev) + ", focus on " + (fi ? fi + (fi.parent ? " in " + fi.parent : "") : "nothing")
-                    + ", window active " + win.active) + ")");
+                + (ta && ta.activeFocus ? "" : "; focus on " + (fi ? fi + (fi.parent ? " in " + fi.parent : "") : "nothing")) + ")");
             if (ta) { ta.insert(0, "Storm rips the lamp glass"); c.focusBoard(); }
         }],
         ["freeform corkboard", () => {
@@ -967,9 +965,12 @@ Item {
             input.key(win, Qt.Key_Left, Qt.AltModifier);
         }],
         ["back and forward", () => {
-            const a = ed().firstArea();
-            check(ws().viewMode === "editor" && ws().current.title === "Arrival", "and again, to the document before");
-            check(a.activeFocus && a.cursorPosition === 7, "with the caret where it was (" + a.cursorPosition + ")");
+            const fi = win.activeFocusItem, back = ws().viewMode === "editor" && ws().current.title === "Arrival";
+            // It failed once on CI only; say where things were if it does again.
+            check(back, "and again, to the document before" + (back ? "" : " (" + ws().viewMode + ", " + ws().current.title + ", place " + ws().navPos
+                + " of " + ws().navList.length + ", focus on " + (fi ? fi + (fi.parent ? " in " + fi.parent : "") : "nothing") + ")"));
+            const a = ed() ? ed().firstArea() : null;
+            check(a && a.activeFocus && a.cursorPosition === 7, "with the caret where it was (" + (a ? a.cursorPosition : "no editor") + ")");
             input.click(win, Qt.point(win.width / 2, win.height / 2), Qt.ForwardButton);
             check(ws().viewMode === "corkboard" && ws().current.title === "The Storm" && ws().canGoForward, "the mouse's Forward button goes forward");
             ws().select(rowId("Arrival"));

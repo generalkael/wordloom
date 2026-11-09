@@ -218,6 +218,8 @@ Notable changes to Wordloom. Each entry lands in the same commit as the change i
   `Cargo.lock`), as Flathub requires, and the AppStream metadata has screenshots.
 
 ### Fixed
+- **+ Note** puts the caret in the new note at once. It used to arrive a moment later, so keys
+  typed straight away (or a busy computer) could leave the note empty.
 - Replace All across the project also changed documents in the Trash, which the search itself
   leaves out.
 - On a freeform corkboard, undoing a card move left the card drawn where it had been dropped.

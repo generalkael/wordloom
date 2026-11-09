@@ -258,8 +258,17 @@ Rectangle {
         if (!containerId) return "";
         const p = at ? { x: snap(at.x), y: snap(at.y) } : nextFreeSpot();
         const id = Api.call("addBoardNote", containerId, p.x, p.y, "");
-        // The board has already reloaded (the call bumps the revision).
-        if (id) { keyId = id; Qt.callLater(() => { const f = noteEditor(id); if (f) f.forceActiveFocus(); }); }
+        // The board has already reloaded (the call bumps the revision), so
+        // the note's editor exists: focus it now. Again once events have run,
+        // in case a menu that just closed hands the focus back. (Only later
+        // left a gap: a key pressed, or a slow test's next step, could land
+        // before it.)
+        if (id) {
+            keyId = id;
+            const focusNote = () => { const f = noteEditor(id); if (f) f.forceActiveFocus(); };
+            focusNote();
+            Qt.callLater(focusNote);
+        }
         return id || "";
     }
     function noteToDocument(noteId) {
