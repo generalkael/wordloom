@@ -847,7 +847,11 @@ ApplicationWindow {
         modal: true
         anchors.centerIn: parent
         standardButtons: Dialog.Ok
+        // An explicit width: the lone OK button stretches to fill the
+        // dialog, so sizing the dialog to fit its buttons is a binding loop.
+        width: aboutText.implicitWidth + leftPadding + rightPadding
         Label {
+            id: aboutText
             text: "<h2>Wordloom</h2><p>A writing studio for long-form work:<br/>binder, corkboard, outliner, split editor,<br/>research files, snapshots, project-wide undo,<br/>spell checking, a name generator,<br/>compile to EPUB / DOCX / HTML / Markdown,<br/>and a story timeline Gantt.</p><p>Built with Rust and Qt " + "6</p>"
             textFormat: Text.RichText
         }

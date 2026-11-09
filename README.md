@@ -414,9 +414,9 @@ their own preferences and recent-projects list.
 
 ## Roadmap
 
-- Windows and macOS installers: the build scripts and release workflow are ready. What's left is
-  the first run of the workflow, and code signing (an Authenticode certificate for Windows, an
-  Apple Developer ID for macOS) so the installers open without a warning
+- Code signing for the Windows and macOS installers: the release workflow builds and tests both
+  (and the Linux packages). What's left is signing them, with an Authenticode certificate for
+  Windows and an Apple Developer ID (plus notarization) for macOS, so they open without a warning
 - Flathub submission: the manifest and metadata are ready; what's left is opening the submission
   pull request on flathub/flathub
 

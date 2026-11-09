@@ -750,9 +750,14 @@ Rectangle {
             visible: !ev.hasFile
             Layout.fillWidth: true
             Layout.fillHeight: true
-            // Don't let content size feed back into the layout (binding loop).
+            // Don't let the content's size feed back into the scroller's
+            // (binding loop): a ScrollView's implicit size follows its content,
+            // and while the editor is hidden (opening or closing a project) no
+            // layout sizes it, so its height would follow the page's.
             Layout.preferredHeight: 100
             Layout.preferredWidth: 100
+            implicitWidth: 100
+            implicitHeight: 100
             clip: true
             contentWidth: scroller.width - 14
             contentHeight: page.height + 48

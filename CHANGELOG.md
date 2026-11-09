@@ -223,6 +223,8 @@ Notable changes to Wordloom. Each entry lands in the same commit as the change i
   `Cargo.lock`), as Flathub requires, and the AppStream metadata has screenshots.
 
 ### Fixed
+- No more "binding loop" warnings on Qt 6.8. They came from the editor's page while a project
+  opened or closed, and from the About dialog when the interface font changed.
 - **+ Note** puts the caret in the new note at once. It used to arrive a moment later, so keys
   typed straight away (or a busy computer) could leave the note empty.
 - Replace All across the project also changed documents in the Trash, which the search itself
