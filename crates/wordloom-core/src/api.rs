@@ -27,6 +27,35 @@ pub struct Reply {
     pub error: Option<String>,
 }
 
+/// A fingerprint of every colour the user can set in a project: labels,
+/// corkboards (each one and the default), board notes, timeline tracks,
+/// events and markers. It changes when any of them does.
+fn colour_print(p: &crate::model::Project) -> u64 {
+    use std::hash::{Hash, Hasher};
+    let mut h = std::collections::hash_map::DefaultHasher::new();
+    for l in &p.labels {
+        (l.id, &l.color).hash(&mut h);
+    }
+    p.boards.color.hash(&mut h);
+    for (id, b) in &p.boards.boards {
+        (id, &b.color).hash(&mut h);
+        for n in &b.notes {
+            (n.id, &n.color).hash(&mut h);
+        }
+    }
+    let t = &p.timeline;
+    for tr in &t.tracks {
+        (tr.id, &tr.color).hash(&mut h);
+    }
+    for e in &t.events {
+        (e.id, &e.color).hash(&mut h);
+    }
+    for m in &t.markers {
+        (m.id, &m.color).hash(&mut h);
+    }
+    h.finish()
+}
+
 /// Turn a QML/Qt URL (`file:///…`) or a plain path into a filesystem path.
 pub fn to_path(s: &str) -> PathBuf {
     let s = s.trim();
@@ -290,6 +319,15 @@ impl App {
             (Some(_), Some(s)) => Some(Checkpoint::take(&s.project)),
             _ => None,
         };
+        // Colour changes are saved at once (below), so they survive a crash
+        // or a forced quit between autosaves.
+        let colours_before = if READ_ONLY.contains(&method) || QUIET.contains(&method) {
+            None
+        } else {
+            self.session
+                .as_ref()
+                .map(|s| (s.dir.clone(), colour_print(&s.project)))
+        };
         let result = self.dispatch(method, &a);
         if let (Ok(_), Some(before), Some((label, key))) = (&result, before, undoable) {
             if let Some(s) = self.session.as_mut() {
@@ -303,11 +341,23 @@ impl App {
                 crate::spell::if_loaded(|sp| sp.set_project_words(words));
             }
         }
+        let mut save_error = None;
+        if let (Ok(_), Some((dir, before)), Some(s)) =
+            (&result, colours_before, self.session.as_mut())
+        {
+            // The same project (not one just opened or created), and a
+            // colour changed: by this call, or by undoing or redoing one.
+            if s.dir == dir && colour_print(&s.project) != before {
+                if let Err(e) = s.save() {
+                    save_error = Some(format!("the colour was changed but couldn't be saved: {e}"));
+                }
+            }
+        }
         match result {
             Ok(v) => Reply {
                 json: json!({"ok": true, "result": v}).to_string(),
                 mutated: !READ_ONLY.contains(&method) && !QUIET.contains(&method),
-                error: None,
+                error: save_error,
             },
             Err(e) => err_reply(&e),
         }
@@ -1060,6 +1110,44 @@ mod tests {
             ok(&app.call("nodeInfo", &json!([id]).to_string()))["file"]["exists"],
             true
         );
+    }
+
+    #[test]
+    fn colour_changes_are_saved_at_once() {
+        let tmp = tempfile::tempdir().unwrap();
+        let mut app = App::new(tmp.path().join("recent.json"));
+        let url = url::Url::from_file_path(tmp.path()).unwrap().to_string();
+        ok(&app.call("newProject", &json!([url, "Book", "Me"]).to_string()));
+        let on_disk =
+            || std::fs::read_to_string(tmp.path().join("Book.wordloom/project.json")).unwrap();
+        let dirty = |app: &App| app.session.as_ref().unwrap().dirty;
+        assert!(!dirty(&app), "opening a project doesn't leave it unsaved");
+
+        // An ordinary change waits for autosave.
+        let ms = ok(&app.call("rootId", r#"["manuscript"]"#));
+        ok(&app.call("setField", &json!([ms, "synopsis", "A storm"]).to_string()));
+        assert!(dirty(&app));
+
+        // A label's colour is written straight away (with the change before it).
+        let id = ok(&app.call("upsertLabel", &json!(["", "Draft", "#ab1234"]).to_string()));
+        assert!(!dirty(&app));
+        assert!(on_disk().contains("#ab1234") && on_disk().contains("A storm"));
+
+        // So is a corkboard's colour, and undoing it.
+        ok(&app.call("setBoardColor", &json!([ms, "#00ff7f"]).to_string()));
+        assert!(!dirty(&app) && on_disk().contains("#00ff7f"));
+        ok(&app.call("undo", ""));
+        assert!(
+            !dirty(&app) && !on_disk().contains("#00ff7f"),
+            "undoing a colour saves too"
+        );
+
+        // Renaming a label (same colour) is an ordinary change.
+        ok(&app.call(
+            "upsertLabel",
+            &json!([id, "First draft", "#ab1234"]).to_string(),
+        ));
+        assert!(dirty(&app));
     }
 
     #[test]

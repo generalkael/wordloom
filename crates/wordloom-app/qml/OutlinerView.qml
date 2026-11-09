@@ -29,7 +29,7 @@ Rectangle {
     }
     signal openRequested(string id)
 
-    Settings {
+    SavedSettings {
         category: "outliner"
         property alias columns: ov.columnsSaved
     }

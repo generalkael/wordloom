@@ -327,10 +327,11 @@ Imported files are not deleted when their item is trashed or the trash is emptie
 duplicates can always find them. To reclaim space, use **File ▸ Clean Up Unused Files…**: it
 deletes only files that no item (in the Trash or not) and no undo or redo step refers to. **Save As** copies `files/` and `snapshots/` to the new project.
 
-Your preferences (most are in **Edit ▸ Preferences…**, Ctrl+,: light/dark, keyboard shortcuts, reopening the last project at startup, how often to autosave, the folder for new projects, editor font, size, line spacing, indent, blank-line height and zoom, page width, corkboard card size and snap to grid, the compile paragraph indent, styled Markdown, smart punctuation, spelling language, name completion, line highlight and its colour, repeated-word highlighting, the backup folders and automatic-backup settings, which panels are
+Your preferences (most are in **Edit ▸ Preferences…**, Ctrl+,: light/dark, keyboard shortcuts, reopening the last project at startup, how often to autosave, the folder for new projects, the interface font and its size, editor font, size, line spacing, indent, blank-line height and zoom, page width, corkboard card size and snap to grid, the compile paragraph indent, styled Markdown, smart punctuation, spelling language, name completion, line highlight and its colour, repeated-word highlighting, the backup folders and automatic-backup settings, which panels are
 shown, timeline lanes, the outliner's extra columns and the window size) are remembered between runs in
 `~/.config/Wordloom/Wordloom.conf`, except the interface size, which is kept in `~/.config/wordloom/interface-scale` because it's needed before Qt starts (in the Flatpak, under `~/.var/app/io.github.generalkael.Wordloom/`).
-They are per user, not stored in projects.
+They are per user, not stored in projects. Each one is written to disk the moment you change it
+(only the window size waits until Wordloom closes), so a crash or a forced quit doesn't lose it.
 
 If you open a project that is already open in another Wordloom, in another window or on
 another computer sharing the folder through Dropbox or Syncthing, Wordloom warns you first,
@@ -344,7 +345,9 @@ again in a *Recovered after restore* folder, so no text is lost.
 
 Every write goes to a temporary file that is then renamed into place, so a crash can't leave a
 file half-written. Wordloom autosaves every 15 seconds while there are unsaved changes (every 5 seconds to every
-5 minutes, in Edit ▸ Preferences ▸ General), and saves again when it closes.
+5 minutes, in Edit ▸ Preferences ▸ General), and saves again when it closes. A colour change
+(a label's, a corkboard's or a note's, a timeline track's, event's or marker's), or undoing or
+redoing one, saves the project at once.
 
 ## Architecture
 

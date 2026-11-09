@@ -325,7 +325,7 @@ Item {
     Component.onCompleted: openFirstScene()
 
     // Panel visibility is remembered between runs.
-    Settings {
+    SavedSettings {
         category: "layout"
         property alias showBinder: ws.showBinder
         property alias showDetails: ws.showInspector

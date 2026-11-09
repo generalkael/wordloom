@@ -51,7 +51,7 @@ Rectangle {
     }
     // Swim lanes: group tracks by kind under collapsible headers.
     property bool lanes: false
-    Settings { category: "timeline"; property alias lanes: gv.lanes }
+    SavedSettings { category: "timeline"; property alias lanes: gv.lanes }
     property var collapsed: ({})
     readonly property int laneH: Theme.px(26)
     readonly property var laneKinds: [

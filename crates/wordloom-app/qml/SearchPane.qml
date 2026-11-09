@@ -19,7 +19,7 @@ ColumnLayout {
     signal chosen(string id, string field)
     spacing: 4
 
-    Settings {
+    SavedSettings {
         category: "search"
         property alias matchCase: sp.matchCase
         property alias wholeWords: sp.wholeWords

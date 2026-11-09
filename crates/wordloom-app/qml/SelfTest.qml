@@ -196,6 +196,14 @@ Item {
             check(prefs.page === "writing", "an unknown page leaves the page as it was");
             prefs.close();
         }],
+        ["preferences saved at once", () => {
+            // Each of these writes a change to disk as it happens (SavedSettings).
+            const keys = (o) => o.savedKeys().slice().sort().join(",");
+            check(Theme.prefs.savedKeys().indexOf("uiFont") >= 0 && Theme.prefs.savedKeys().indexOf("lineHighlightColor") >= 0
+                && Theme.prefs.savedKeys().indexOf("savedKeys") < 0, "appearance preferences are written as they change (" + Theme.prefs.savedKeys().length + ")");
+            check(keys(Theme.general) === "autosaveSeconds,projectsFolder,reopenLast", "so are the general ones (" + keys(Theme.general) + ")");
+            check(keys(Shortcuts.saved) === "custom", "and keyboard shortcuts (" + keys(Shortcuts.saved) + ")");
+        }],
         ["interface font", () => {
             Theme.resetUiFont();
             check(win.font.family === Theme.systemFont.family && Math.abs(win.font.pointSize - Theme.systemPointSize) < 0.01 && Theme.px(11) === 11,
@@ -605,6 +613,7 @@ Item {
             check(c.board.notes.length === 0, "Delete removes a highlighted note");
             c.setBoardColor("#3f6b4e");
             check(Qt.colorEqual(c.color, "#3f6b4e") && !c.boardIsLight, "the board takes the chosen colour (" + c.color + ")");
+            check(!Wordloom.dirty, "and it's saved at once, without waiting for autosave");
             check(Api.get("board", null, rowId("The Log")).color === null, "only this board (" + JSON.stringify(Api.get("board", null, rowId("The Log")).color) + ")");
             c.useColorEverywhere();
             check(Api.get("board", null, rowId("The Log")).color === "#3f6b4e", "Use This Colour on All Boards sets the others");

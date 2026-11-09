@@ -18,11 +18,11 @@ ApplicationWindow {
         property alias width: win.width
         property alias height: win.height
     }
-    Settings {
+    SavedSettings {
         category: "bible"
         property alias folder: bibleDialog.lastFolder
     }
-    Settings {
+    SavedSettings {
         category: "backup"
         property alias folder: backupDialog.lastFolder
         property alias autoOnClose: autoBackup.closeBackups

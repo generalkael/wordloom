@@ -40,7 +40,7 @@ Rectangle {
     // (right-click ▸ Add to Favourites, or Project ▸ Add to Favourites).
     property var favorites: []
     property bool favoritesOpen: true
-    Settings { category: "binder"; property alias favoritesOpen: pane.favoritesOpen }
+    SavedSettings { category: "binder"; property alias favoritesOpen: pane.favoritesOpen }
     function setFavorite(id, on) { Api.call("setFavorite", id, on); }
     // Window coordinates of the middle of Favourites entry `i` (self-test).
     function favoritePoint(i) { favRep.positionViewAtIndex(i, ListView.Contain); const it = favRep.itemAtIndex(i); return it ? it.mapToItem(null, it.width / 2, it.height / 2) : null; }

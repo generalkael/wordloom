@@ -31,6 +31,7 @@ const QML: &[&str] = &[
     "qml/SearchPane.qml",
     "qml/KindIcon.qml",
     "qml/ShortcutsPage.qml",
+    "qml/SavedSettings.qml",
 ];
 
 /// `pragma Singleton` QML files.

@@ -24,14 +24,14 @@ Dialog {
     readonly property bool richPreview: formatBox.currentIndex >= 3
     readonly property bool isPdf: formats[formatBox.currentIndex] === "pdf"
     readonly property bool manuscriptStyle: isPdf && pdfStyle.currentIndex === 1
-    Settings {
+    SavedSettings {
         category: "pdf"
         property alias style: pdfStyle.currentIndex
         property alias paper: paperBox.currentIndex
         property alias font: fontBox.currentIndex
         property alias contact: contactField.text
     }
-    Settings {
+    SavedSettings {
         category: "compile"
         property alias indent: indentBox.currentIndex
     }

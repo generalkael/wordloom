@@ -251,6 +251,10 @@ Notable changes to Wordloom. Each entry lands in the same commit as the change i
   start screen and New Document once a project is open.
 
 ### Changed
+- **Preferences and colours are saved the moment you change them.** Preferences used to be
+  written a little later (at the latest when Wordloom quit), and colours waited for autosave, so a
+  crash or a forced quit could lose them. A colour change (labels, corkboards, notes, timeline
+  tracks, events and markers), or undoing one, now saves the project at once.
 - Settings moved into Preferences: Appearance, Line Highlight Colour, Spelling Language, Complete
   Names and Smart Punctuation (from the View menu), Automatic Backups (from the File menu) and the
   Editor Font & Spacing dialog (now its Font & Spacing page; *Aa* and View ▸ Editor Font & Spacing…

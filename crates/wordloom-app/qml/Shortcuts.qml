@@ -86,7 +86,7 @@ QtObject {
     // Changed shortcuts, {id: keys}; "" means none. Saved as JSON.
     property string customJson: "{}"
     readonly property var custom: { try { return JSON.parse(customJson) || {}; } catch (e) { return {}; } }
-    property Settings saved: Settings {
+    property Settings saved: SavedSettings {
         category: "shortcuts"
         property alias custom: sc.customJson
     }

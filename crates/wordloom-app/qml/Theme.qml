@@ -97,7 +97,7 @@ QtObject {
     property string projectsFolder: ""
     readonly property string defaultProjectsFolder: StandardPaths.writableLocation(StandardPaths.DocumentsLocation).toString() + "/Wordloom"
     readonly property string newProjectsFolder: projectsFolder || defaultProjectsFolder
-    property Settings general: Settings {
+    property Settings general: SavedSettings {
         category: "general"
         property alias reopenLast: theme.reopenLast
         property alias autosaveSeconds: theme.autosaveSeconds
@@ -105,7 +105,7 @@ QtObject {
     }
 
     // Remembered between runs (~/.config/Wordloom/Wordloom.conf on Linux).
-    property Settings prefs: Settings {
+    property Settings prefs: SavedSettings {
         category: "appearance"
         property alias theme: theme.forced
         property alias uiFont: theme.uiFont
