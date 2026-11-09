@@ -13,7 +13,7 @@ import com.wordloom.styling
 // that one is `secondary` and offers swap / close buttons.
 Rectangle {
     id: ev
-    color: focusMode ? (Theme.dark ? "#141517" : "#e9e5dc") : Theme.window
+    color: focusMode ? (Theme.dark ? "#141517" : "#e9e5dc") : Theme.editorBackground
 
     property string nodeId: ""
     property var node: null
@@ -535,7 +535,7 @@ Rectangle {
             Layout.fillWidth: true
             Layout.preferredHeight: 34
             visible: !ev.focusMode && ev.node !== null
-            color: Theme.window
+            color: Theme.editorBackground
             Rectangle {
                 visible: ev.targeted
                 width: parent.width; height: 2
@@ -999,8 +999,8 @@ Rectangle {
             font.family: Theme.editorFont
             font.pixelSize: Theme.editorPixelSize
             color: Theme.ink
-            selectionColor: Theme.selection
-            selectedTextColor: Theme.ink
+            selectionColor: Theme.editorSelection
+            selectedTextColor: Theme.editorSelectedText
             placeholderText: de.composite ? "" : qsTr("Begin writing…")
             background: null
             leftPadding: 0

@@ -7,7 +7,7 @@ import com.wordloom.app
 // selected item.
 Rectangle {
     id: ip
-    color: Theme.panel
+    color: Theme.detailsBackground
 
     property string nodeId: ""
     property var node: null
@@ -86,7 +86,7 @@ Rectangle {
                     spacing: 6
 
                     Item { Layout.preferredHeight: 4 }
-                    Label { text: qsTr("Title"); color: Theme.subtext; font.pixelSize: Theme.px(11) }
+                    Label { text: qsTr("Title"); color: Theme.detailsSubtext; font.pixelSize: Theme.px(11) }
                     TextField {
                         Layout.fillWidth: true
                         text: ip.node ? ip.node.title : ""
@@ -95,11 +95,11 @@ Rectangle {
                         onEditingFinished: if (ip.node && text !== ip.node.title) ip.set("title", text)
                     }
 
-                    Label { text: qsTr("Synopsis"); color: Theme.subtext; font.pixelSize: Theme.px(11) }
+                    Label { text: qsTr("Synopsis"); color: Theme.detailsSubtext; font.pixelSize: Theme.px(11) }
                     Rectangle {
                         Layout.fillWidth: true
                         Layout.preferredHeight: 120
-                        color: Theme.card
+                        color: Theme.detailsField
                         border.color: Theme.border
                         radius: 3
                         ScrollView {
@@ -108,7 +108,7 @@ Rectangle {
                                 text: ip.node ? ip.node.synopsis : ""
                                 wrapMode: TextEdit.Wrap
                                 font.family: Theme.editorFont
-                                color: Theme.ink
+                                color: Theme.detailsFieldText
                                 background: null
                                 selectByMouse: true
                                 placeholderText: qsTr("What happens here, in a line or two")
@@ -121,28 +121,28 @@ Rectangle {
                         Layout.fillWidth: true
                         columns: 2
                         columnSpacing: 8
-                        Label { text: qsTr("Label"); color: Theme.subtext }
+                        Label { text: qsTr("Label"); color: Theme.detailsSubtext }
                         ComboBox {
                             Layout.fillWidth: true
                             model: [qsTr("No Label")].concat(ip.meta.labels.map(l => l.name))
                             currentIndex: ip.node ? 1 + ip.meta.labels.findIndex(l => l.id === ip.node.label) : 0
                             onActivated: (i) => ip.set("label", i === 0 ? "" : ip.meta.labels[i - 1].id)
                         }
-                        Label { text: qsTr("Status"); color: Theme.subtext }
+                        Label { text: qsTr("Status"); color: Theme.detailsSubtext }
                         ComboBox {
                             Layout.fillWidth: true
                             model: [qsTr("No Status")].concat(ip.meta.statuses.map(s => s.name))
                             currentIndex: ip.node ? 1 + ip.meta.statuses.findIndex(s => s.id === ip.node.status) : 0
                             onActivated: (i) => ip.set("status", i === 0 ? "" : ip.meta.statuses[i - 1].id)
                         }
-                        Label { text: qsTr("Keywords"); color: Theme.subtext }
+                        Label { text: qsTr("Keywords"); color: Theme.detailsSubtext }
                         TextField {
                             Layout.fillWidth: true
                             text: ip.node ? ip.node.keywords.join(", ") : ""
                             placeholderText: qsTr("comma, separated")
                             onEditingFinished: if (ip.node && text !== ip.node.keywords.join(", ")) ip.set("keywords", text)
                         }
-                        Label { text: qsTr("Target"); color: Theme.subtext }
+                        Label { text: qsTr("Target"); color: Theme.detailsSubtext }
                         TextField {
                             Layout.fillWidth: true
                             text: ip.node && ip.node.target_words ? String(ip.node.target_words) : ""
@@ -164,7 +164,7 @@ Rectangle {
                         text: ip.node && ip.node.kind === "character" ? qsTr("Character sheet")
                             : ip.node && ip.node.kind === "place" ? qsTr("Place sheet") : qsTr("Custom fields")
                         font.bold: true
-                        color: Theme.text
+                        color: Theme.detailsText
                         Layout.topMargin: 8
                     }
                     Repeater {
@@ -173,7 +173,7 @@ Rectangle {
                             required property string modelData
                             Layout.fillWidth: true
                             spacing: 1
-                            Label { text: modelData; color: Theme.subtext; font.pixelSize: Theme.px(11) }
+                            Label { text: modelData; color: Theme.detailsSubtext; font.pixelSize: Theme.px(11) }
                             TextField {
                                 Layout.fillWidth: true
                                 text: ip.node && ip.node.fields[modelData] ? ip.node.fields[modelData] : ""
@@ -193,7 +193,7 @@ Rectangle {
                         visible: ip.node !== null && (ip.node.kind === "character" || ip.node.relations.length > 0)
                         Layout.fillWidth: true
                         Layout.topMargin: 6
-                        Label { text: qsTr("Relationships"); font.bold: true; color: Theme.text; Layout.fillWidth: true }
+                        Label { text: qsTr("Relationships"); font.bold: true; color: Theme.detailsText; Layout.fillWidth: true }
                         ToolButton { text: qsTr("Map…"); onClicked: ip.openRelations(); ToolTip.visible: hovered; ToolTip.text: qsTr("Open the relationship map (Ctrl+6)") }
                     }
                     Repeater {
@@ -202,7 +202,7 @@ Rectangle {
                             required property var modelData
                             Layout.fillWidth: true
                             wrapMode: Text.Wrap
-                            color: Theme.text
+                            color: Theme.detailsText
                             // Read in the label's direction: "→ distrusts Tobias Wren" (this
                             // character is the subject) or "← Ilse Varga · older sister of".
                             text: modelData.outgoing
@@ -213,7 +213,7 @@ Rectangle {
                     Label {
                         visible: ip.node !== null && ip.node.kind === "character" && ip.node.relations.length === 0
                         text: qsTr("None yet. Connect characters on the relationship map.")
-                        color: Theme.subtext
+                        color: Theme.detailsSubtext
                         font.pixelSize: Theme.px(11)
                         wrapMode: Text.Wrap
                         Layout.fillWidth: true
@@ -228,7 +228,7 @@ Rectangle {
                             : qsTr("Appears in %1 · %2").arg(Api.plural(ip.appearances.documents.length, qsTr("document")))
                                 .arg(Api.plural(ip.appearances.total, qsTr("mention")))
                         font.bold: true
-                        color: Theme.text
+                        color: Theme.detailsText
                     }
                     Repeater {
                         model: ip.tracksAppearances && ip.appearances ? ip.appearances.documents : []
@@ -240,8 +240,8 @@ Rectangle {
                             ToolTip.visible: hovered
                             ToolTip.text: qsTr("Open it and find “%1”").arg(modelData.name)
                             contentItem: RowLayout {
-                                Label { text: modelData.title; color: Theme.text; elide: Text.ElideRight; Layout.fillWidth: true }
-                                Label { text: String(modelData.count); color: Theme.subtext }
+                                Label { text: modelData.title; color: Theme.detailsText; elide: Text.ElideRight; Layout.fillWidth: true }
+                                Label { text: String(modelData.count); color: Theme.detailsSubtext }
                             }
                         }
                     }
@@ -251,7 +251,7 @@ Rectangle {
                             + qsTr("Looks for %1 (whole words, matching case). Add other names to the “Also known as” field, separated by commas.")
                                 .arg(ip.appearances.names.map(n => "“" + n + "”").join(", "))
                         textFormat: Text.PlainText
-                        color: Theme.subtext
+                        color: Theme.detailsSubtext
                         font.pixelSize: Theme.px(11)
                         wrapMode: Text.Wrap
                         Layout.fillWidth: true
@@ -260,7 +260,7 @@ Rectangle {
                     Rectangle { Layout.fillWidth: true; height: 1; color: Theme.border; Layout.topMargin: 6 }
                     Label {
                         Layout.fillWidth: true
-                        color: Theme.subtext
+                        color: Theme.detailsSubtext
                         font.pixelSize: Theme.px(11)
                         wrapMode: Text.Wrap
                         text: ip.node ? qsTr("%1 words here · %2 including children · %3 characters\nCreated %4\nModified %5")
@@ -275,7 +275,7 @@ Rectangle {
             // ---------------- Notes ----------------
             ColumnLayout {
                 spacing: 4
-                Label { text: qsTr("Comments in the text"); color: Theme.subtext; Layout.leftMargin: 8; Layout.topMargin: 8 }
+                Label { text: qsTr("Comments in the text"); color: Theme.detailsSubtext; Layout.leftMargin: 8; Layout.topMargin: 8 }
                 ListView {
                     id: commentList
                     Layout.fillWidth: true
@@ -291,8 +291,8 @@ Rectangle {
                         ToolTip.text: qsTr("Show it in the editor")
                         contentItem: ColumnLayout {
                             spacing: 0
-                            Label { text: modelData.text || qsTr("(empty comment)"); textFormat: Text.PlainText; color: Theme.text; wrapMode: Text.Wrap; maximumLineCount: 3; elide: Text.ElideRight; Layout.fillWidth: true }
-                            Label { visible: modelData.node !== ip.nodeId; text: modelData.title; color: Theme.subtext; font.pixelSize: Theme.px(11); elide: Text.ElideRight; Layout.fillWidth: true }
+                            Label { text: modelData.text || qsTr("(empty comment)"); textFormat: Text.PlainText; color: Theme.detailsText; wrapMode: Text.Wrap; maximumLineCount: 3; elide: Text.ElideRight; Layout.fillWidth: true }
+                            Label { visible: modelData.node !== ip.nodeId; text: modelData.title; color: Theme.detailsSubtext; font.pixelSize: Theme.px(11); elide: Text.ElideRight; Layout.fillWidth: true }
                         }
                     }
                 }
@@ -300,14 +300,14 @@ Rectangle {
                     visible: ip.comments.length === 0
                     text: qsTr("None. Ctrl+Alt+M (or { } on the format bar) adds one: {>> like this <<}. Comments aren't counted or exported.")
                     textFormat: Text.PlainText
-                    color: Theme.subtext
+                    color: Theme.detailsSubtext
                     font.pixelSize: Theme.px(11)
                     wrapMode: Text.Wrap
                     Layout.fillWidth: true
                     Layout.leftMargin: 8
                     Layout.rightMargin: 8
                 }
-                Label { text: qsTr("Document notes"); color: Theme.subtext; Layout.margins: 8 }
+                Label { text: qsTr("Document notes"); color: Theme.detailsSubtext; Layout.margins: 8 }
                 ScrollView {
                     Layout.fillWidth: true
                     Layout.fillHeight: true
@@ -317,8 +317,8 @@ Rectangle {
                         wrapMode: TextEdit.Wrap
                         selectByMouse: true
                         placeholderText: qsTr("Research, reminders, things to fix…")
-                        background: Rectangle { color: Theme.card; border.color: Theme.border; radius: 3 }
-                        color: Theme.ink
+                        background: Rectangle { color: Theme.detailsField; border.color: Theme.border; radius: 3 }
+                        color: Theme.detailsFieldText
                         onActiveFocusChanged: if (!activeFocus && ip.node && text !== ip.node.notes) ip.set("notes", text)
                     }
                 }
@@ -353,10 +353,10 @@ Rectangle {
                         onClicked: ip.snapIndex = index
                         contentItem: ColumnLayout {
                             spacing: 0
-                            Label { text: modelData.title; color: Theme.text; elide: Text.ElideRight; Layout.fillWidth: true }
+                            Label { text: modelData.title; color: Theme.detailsText; elide: Text.ElideRight; Layout.fillWidth: true }
                             Label {
                                 text: new Date(modelData.created).toLocaleString(Qt.locale(), Locale.ShortFormat) + (modelData.group ? " · " + (modelData.count === 1 ? qsTr("1 document") : qsTr("%1 documents").arg(modelData.count)) : "")
-                                color: Theme.subtext; font.pixelSize: Theme.px(11)
+                                color: Theme.detailsSubtext; font.pixelSize: Theme.px(11)
                             }
                         }
                     }
@@ -366,7 +366,7 @@ Rectangle {
                     text: ip.node && ip.node.child_count > 0
                         ? qsTr("No snapshots yet. Taking one here saves every document in this folder at once, under one name, before a big revision.")
                         : qsTr("No snapshots yet. Take one before a big revision.")
-                    color: Theme.subtext; wrapMode: Text.Wrap; Layout.fillWidth: true; Layout.margins: 8
+                    color: Theme.detailsSubtext; wrapMode: Text.Wrap; Layout.fillWidth: true; Layout.margins: 8
                 }
                 RowLayout {
                     visible: ip.snapIndex >= 0
@@ -394,8 +394,8 @@ Rectangle {
                         wrapMode: TextEdit.Wrap
                         text: ip.snapIndex >= 0 && ip.snaps[ip.snapIndex] ? ip.snaps[ip.snapIndex].text : ""
                         font.family: Theme.editorFont
-                        color: Theme.ink
-                        background: Rectangle { color: Theme.card; border.color: Theme.border; radius: 3 }
+                        color: Theme.detailsFieldText
+                        background: Rectangle { color: Theme.detailsField; border.color: Theme.border; radius: 3 }
                     }
                 }
                 Item { Layout.fillHeight: true; visible: ip.snapIndex < 0 }
@@ -404,7 +404,7 @@ Rectangle {
             // ---------------- Timeline ----------------
             ColumnLayout {
                 spacing: 6
-                Label { text: qsTr("Timeline events showing this item"); color: Theme.subtext; Layout.margins: 8; wrapMode: Text.Wrap; Layout.fillWidth: true }
+                Label { text: qsTr("Timeline events showing this item"); color: Theme.detailsSubtext; Layout.margins: 8; wrapMode: Text.Wrap; Layout.fillWidth: true }
                 Repeater {
                     model: ip.node ? ip.node.events : []
                     delegate: ItemDelegate {
@@ -414,7 +414,7 @@ Rectangle {
                         onClicked: ip.openEvent()
                     }
                 }
-                Label { visible: ip.node && ip.node.events.length === 0; text: qsTr("Not on the timeline yet."); color: Theme.subtext; Layout.leftMargin: 8 }
+                Label { visible: ip.node && ip.node.events.length === 0; text: qsTr("Not on the timeline yet."); color: Theme.detailsSubtext; Layout.leftMargin: 8 }
                 Button {
                     Layout.margins: 8
                     text: qsTr("+ Add to Timeline")
@@ -442,6 +442,6 @@ Rectangle {
         anchors.centerIn: parent
         visible: ip.node === null
         text: qsTr("Nothing selected")
-        color: Theme.subtext
+        color: Theme.detailsSubtext
     }
 }

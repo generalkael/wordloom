@@ -20,6 +20,7 @@ Dialog {
     readonly property var pages: [
         { id: "general", name: qsTr("General") },
         { id: "interface", name: qsTr("Interface") },
+        { id: "colours", name: qsTr("Colours") },
         { id: "font", name: qsTr("Font & Spacing") },
         { id: "editor", name: qsTr("Editor") },
         { id: "writing", name: qsTr("Spelling & Typing") },
@@ -141,6 +142,20 @@ Dialog {
         title: qsTr("Line Highlight Colour")
         options: ColorDialog.ShowAlphaChannel
         onAccepted: pd.setLineColour(selectedColor)
+    }
+    // ---- Colours ----
+    // The role the colour dialog is choosing for (Theme.colourAreas).
+    property string colourRole: ""
+    function chooseColour(role) {
+        colourRole = role;
+        roleColourDialog.selectedColor = Theme[role];
+        roleColourDialog.open();
+    }
+    function colourHex(c) { return String(c).toUpperCase(); }
+    ColorDialog {
+        id: roleColourDialog
+        title: qsTr("Choose a Colour")
+        onAccepted: if (pd.colourRole) Theme.setColour(pd.colourRole, String(selectedColor))
     }
     FolderDialog {
         id: projectsFolderDialog
@@ -403,6 +418,103 @@ Dialog {
                     Note {
                         text: qsTr("Sizes throughout Wordloom follow this one: headings, captions and list rows grow and shrink with it. The editor has its own font, in Font & Spacing. Interface size, under General, scales everything, including the editor and the icons.")
                     }
+                }
+            }
+
+            // ---------------- Colours ----------------
+            ScrollView {
+                id: coloursPage
+                contentWidth: availableWidth
+                ColumnLayout {
+                    width: parent.width
+                    spacing: 8
+                    RowLayout {
+                        Layout.fillWidth: true
+                        Note {
+                            text: Theme.dark ? qsTr("Colours for the dark theme. The light theme keeps its own; switch on the General page to change them.")
+                                             : qsTr("Colours for the light theme. The dark theme keeps its own; switch on the General page to change them.")
+                        }
+                        Button {
+                            text: qsTr("Reset All")
+                            enabled: Object.keys(Theme.custom).length > 0
+                            onClicked: Theme.resetColours()
+                        }
+                    }
+                    Repeater {
+                        model: Theme.colourAreas
+                        delegate: ColumnLayout {
+                            id: area
+                            required property var modelData
+                            readonly property var roles: modelData.roles.map(r => r.role)
+                            Layout.fillWidth: true
+                            spacing: 4
+                            RowLayout {
+                                Layout.fillWidth: true
+                                Heading { text: area.modelData.name; Layout.fillWidth: true }
+                                ToolButton {
+                                    text: qsTr("Reset %1").arg(area.modelData.name)
+                                    enabled: area.roles.some(r => Theme.isCustom(r))
+                                    onClicked: Theme.resetColours(area.roles)
+                                }
+                            }
+                            Note { visible: !!area.modelData.note; text: area.modelData.note || "" }
+                            ColumnLayout {
+                                Layout.fillWidth: true
+                                spacing: 2
+                                Repeater {
+                                    model: area.modelData.roles
+                                    delegate: Item {
+                                        id: roleRow
+                                        required property var modelData
+                                        Layout.fillWidth: true
+                                        implicitHeight: Theme.px(28)
+                                        implicitWidth: rowLayout.implicitWidth
+                                        readonly property bool custom: Theme.isCustom(modelData.role)
+                                        RowLayout {
+                                            id: rowLayout
+                                            anchors.fill: parent
+                                            spacing: 10
+                                            Label {
+                                                text: roleRow.modelData.name
+                                                color: Theme.text
+                                                Layout.preferredWidth: Theme.px(230)
+                                                elide: Text.ElideRight
+                                            }
+                                            Rectangle {
+                                                objectName: "swatch-" + roleRow.modelData.role
+                                                width: Theme.px(40); height: Theme.px(22); radius: 4
+                                                color: Theme[roleRow.modelData.role]
+                                                border.color: swatchArea.containsMouse ? Theme.accent : Theme.border
+                                                border.width: swatchArea.containsMouse ? 2 : 1
+                                                MouseArea {
+                                                    id: swatchArea
+                                                    anchors.fill: parent
+                                                    hoverEnabled: true
+                                                    cursorShape: Qt.PointingHandCursor
+                                                    onClicked: pd.chooseColour(roleRow.modelData.role)
+                                                }
+                                                ToolTip.visible: swatchArea.containsMouse
+                                                ToolTip.text: qsTr("Choose a colour")
+                                            }
+                                            Label {
+                                                text: pd.colourHex(Theme[roleRow.modelData.role]) + (roleRow.custom ? "" : qsTr(" (default)"))
+                                                color: Theme.subtext
+                                                font.family: "monospace"
+                                                Layout.preferredWidth: Theme.px(150)
+                                            }
+                                            ToolButton {
+                                                text: qsTr("Reset")
+                                                enabled: roleRow.custom
+                                                onClicked: Theme.setColour(roleRow.modelData.role, "")
+                                            }
+                                            Item { Layout.fillWidth: true }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    Note { text: qsTr("The current-line highlight is chosen on the Editor page. Label and board colours belong to each project.") }
                 }
             }
 

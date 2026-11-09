@@ -8,7 +8,7 @@ import com.wordloom.app
 // navigation and a project search field.
 Rectangle {
     id: pane
-    color: Theme.panel
+    color: Theme.binderBackground
 
     property string currentId: ""
     property var rows: []
@@ -119,7 +119,7 @@ Rectangle {
                     anchors.leftMargin: 10
                     anchors.verticalCenter: parent.verticalCenter
                     text: (pane.favoritesOpen ? "▾  " : "▸  ") + qsTr("★ Favourites") + (pane.favoritesOpen ? "" : "  (" + pane.favorites.length + ")")
-                    color: Theme.subtext
+                    color: Theme.binderSubtext
                     font.bold: true
                 }
                 MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: pane.favoritesOpen = !pane.favoritesOpen }
@@ -144,7 +144,7 @@ Rectangle {
                         anchors.leftMargin: 4
                         anchors.rightMargin: 4
                         radius: 4
-                        color: fav.modelData.id === pane.currentId ? Theme.selection : (favHover.hovered ? Qt.rgba(0.5, 0.5, 0.5, 0.12) : "transparent")
+                        color: fav.modelData.id === pane.currentId ? Theme.binderSelection : (favHover.hovered ? Qt.rgba(0.5, 0.5, 0.5, 0.12) : "transparent")
                     }
                     HoverHandler { id: favHover }
                     RowLayout {
@@ -153,7 +153,7 @@ Rectangle {
                         anchors.rightMargin: 8
                         spacing: 4
                         KindIcon { kind: fav.modelData.kind; role: "" }
-                        Label { text: fav.modelData.title; color: Theme.text; elide: Text.ElideRight; Layout.fillWidth: true }
+                        Label { text: fav.modelData.title; color: Theme.binderText; elide: Text.ElideRight; Layout.fillWidth: true }
                     }
                     ToolTip.visible: favHover.hovered && fav.modelData.where !== ""
                     ToolTip.delay: 600
@@ -223,7 +223,7 @@ Rectangle {
                     anchors.leftMargin: 4
                     anchors.rightMargin: 4
                     radius: 4
-                    color: row.isCurrent || row.isPicked ? Theme.selection : (hover.hovered ? Qt.rgba(0.5, 0.5, 0.5, 0.12) : "transparent")
+                    color: row.isCurrent || row.isPicked ? Theme.binderSelection : (hover.hovered ? Qt.rgba(0.5, 0.5, 0.5, 0.12) : "transparent")
                     border.width: row.isPicked ? 1 : 0
                     border.color: Theme.accent
                 }
@@ -249,7 +249,7 @@ Rectangle {
                     spacing: 4
                     Label {
                         text: row.modelData.has_children ? (row.modelData.expanded ? "▾" : "▸") : ""
-                        color: Theme.subtext
+                        color: Theme.binderSubtext
                         Layout.preferredWidth: 12
                         MouseArea {
                             anchors.fill: parent
@@ -267,7 +267,7 @@ Rectangle {
                     Label {
                         visible: pane.renamingId !== row.modelData.id
                         text: row.modelData.title
-                        color: Theme.text
+                        color: Theme.binderText
                         font.bold: row.isRoot
                         elide: Text.ElideRight
                         Layout.fillWidth: true

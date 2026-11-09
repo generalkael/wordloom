@@ -5,6 +5,11 @@ Notable changes to Wordloom. Each entry lands in the same commit as the change i
 ## Unreleased
 
 ### Added
+- **Custom colours.** Preferences ▸ Colours changes the colour of text, backgrounds, borders,
+  highlights and the selection: for the whole interface, and separately for the binder, Details,
+  editor, corkboard and outliner. An area follows the interface's colours until you give it its
+  own. The light and dark themes keep separate colours. Each colour, each area and the whole page
+  can be reset. Changes apply and are saved at once.
 - **Interface font and size.** Preferences ▸ Interface picks the font for menus, panels, dialogs,
   the binder, cards and lists, and its size in points (7 to 20). Headings, captions and list rows
   grow and shrink with it, and it applies at once. *Use the System Font* goes back to the

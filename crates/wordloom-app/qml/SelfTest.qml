@@ -204,6 +204,43 @@ Item {
             check(keys(Theme.general) === "autosaveSeconds,projectsFolder,reopenLast", "so are the general ones (" + keys(Theme.general) + ")");
             check(keys(Shortcuts.saved) === "custom", "and keyboard shortcuts (" + keys(Shortcuts.saved) + ")");
         }],
+        ["custom colours", () => {
+            const was = Theme.forced, binder = ws().binderRef(), ip = ws().inspectorRef();
+            Theme.resetColours();
+            Theme.forced = "light";
+            const defText = String(Theme.binderText);
+            check(Qt.colorEqual(Theme.binderText, Theme.text) && Qt.colorEqual(binder.color, Theme.panel) && !Theme.isCustom("binderText"),
+                "areas follow the interface colours by default");
+            Theme.setColour("text", "#112233");
+            check(Qt.colorEqual(Theme.binderText, "#112233") && Qt.colorEqual(Theme.detailsText, "#112233"), "changing the interface text colours the binder and Details too");
+            Theme.setColour("binderBackground", "#204060");
+            Theme.setColour("detailsField", "#fafad2");
+            Theme.setColour("cork", "#556b2f");
+            check(Qt.colorEqual(binder.color, "#204060") && Qt.colorEqual(Theme.detailsField, "#fafad2") && Qt.colorEqual(Theme.cork, "#556b2f") && Qt.colorEqual(Theme.panel, Theme.detailsBackground),
+                "an area's own colour changes only that area");
+            check(Qt.colorEqual(ip.color, Theme.detailsBackground), "the Details panel uses its own colours");
+            check(Theme.prefs.savedKeys().indexOf("colourOverrides") >= 0 && JSON.parse(Theme.colourOverrides).light.cork === "#556b2f",
+                "chosen colours are saved with the preferences (" + Theme.colourOverrides + ")");
+            Theme.forced = "dark";
+            check(!Theme.isCustom("cork") && !Qt.colorEqual(Theme.binderBackground, "#204060"), "the dark theme keeps its own colours");
+            Theme.setColour("ink", "#eeeeaa");
+            check(Qt.colorEqual(Theme.ink, "#eeeeaa") && Qt.colorEqual(Theme.cardText, "#eeeeaa") && Qt.colorEqual(Theme.editorSelectedText, "#eeeeaa"), "and can be changed on their own");
+            Theme.forced = "light";
+            check(Qt.colorEqual(Theme.cork, "#556b2f") && !Theme.isCustom("ink"), "switching back brings the light theme's colours back");
+            Theme.resetColours(["binderBackground"]);
+            check(!Theme.isCustom("binderBackground") && Theme.isCustom("cork"), "an area can be reset on its own");
+            Theme.colourOverrides = '{"light": {"text": "not a colour"}}';
+            check(Qt.colorEqual(Theme.text, "#24231f"), "a damaged colour falls back to the default");
+            Theme.colourOverrides = "nonsense";
+            check(Object.keys(Theme.custom).length === 0, "so does damaged colour preferences text");
+            prefs.openAt("colours");
+            check(prefs.page === "colours", "Preferences has a Colours page");
+            prefs.close();
+            Theme.forced = "dark"; Theme.resetColours();
+            Theme.forced = "light"; Theme.resetColours();
+            check(Theme.colourOverrides === "{}" && String(Theme.binderText) === defText, "Reset All goes back to the defaults");
+            Theme.forced = was;
+        }],
         ["interface font", () => {
             Theme.resetUiFont();
             check(win.font.family === Theme.systemFont.family && Math.abs(win.font.pointSize - Theme.systemPointSize) < 0.01 && Theme.px(11) === 11,

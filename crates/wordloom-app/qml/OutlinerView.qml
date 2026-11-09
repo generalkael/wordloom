@@ -10,7 +10,7 @@ import com.wordloom.app
 // and any custom field (POV, Setting, …) used below the item.
 Rectangle {
     id: ov
-    color: Theme.base
+    color: Theme.outlinerBackground
 
     property string nodeId: ""
     property var node: null
@@ -153,7 +153,7 @@ Rectangle {
         Rectangle {
             Layout.fillWidth: true
             Layout.preferredHeight: 34
-            color: Theme.base
+            color: Theme.outlinerBackground
             RowLayout {
                 anchors.fill: parent
                 anchors.leftMargin: 10
@@ -237,23 +237,23 @@ Rectangle {
                 z: 3
                 width: ov.tableWidth
                 height: Theme.px(30)
-                color: Theme.panel
+                color: Theme.outlinerAlternate
                 RowLayout {
                     anchors.fill: parent
                     anchors.leftMargin: 10
                     anchors.rightMargin: 10
                     spacing: 8
-                    Label { text: qsTr("Title"); font.bold: true; Layout.preferredWidth: ov.widths[0]; Layout.minimumWidth: ov.widths[0]; color: Theme.subtext }
-                    Label { text: qsTr("Synopsis"); font.bold: true; Layout.fillWidth: true; Layout.minimumWidth: 80; color: Theme.subtext }
+                    Label { text: qsTr("Title"); font.bold: true; Layout.preferredWidth: ov.widths[0]; Layout.minimumWidth: ov.widths[0]; color: Theme.outlinerSubtext }
+                    Label { text: qsTr("Synopsis"); font.bold: true; Layout.fillWidth: true; Layout.minimumWidth: 80; color: Theme.outlinerSubtext }
                     Repeater {
                         model: ov.columns
-                        Label { required property var modelData; text: ov.columnTitle(modelData); font.bold: true; elide: Text.ElideRight; Layout.preferredWidth: ov.extraWidth; color: Theme.subtext }
+                        Label { required property var modelData; text: ov.columnTitle(modelData); font.bold: true; elide: Text.ElideRight; Layout.preferredWidth: ov.extraWidth; color: Theme.outlinerSubtext }
                     }
-                    Label { text: qsTr("Label"); font.bold: true; Layout.preferredWidth: ov.widths[2]; color: Theme.subtext }
-                    Label { text: qsTr("Status"); font.bold: true; Layout.preferredWidth: ov.widths[3]; color: Theme.subtext }
-                    Label { text: qsTr("Words"); font.bold: true; Layout.preferredWidth: ov.widths[4]; horizontalAlignment: Text.AlignRight; color: Theme.subtext }
-                    Label { text: qsTr("Target"); font.bold: true; Layout.preferredWidth: ov.widths[5]; horizontalAlignment: Text.AlignRight; color: Theme.subtext }
-                    Label { text: qsTr("Progress"); font.bold: true; Layout.preferredWidth: ov.widths[6]; color: Theme.subtext }
+                    Label { text: qsTr("Label"); font.bold: true; Layout.preferredWidth: ov.widths[2]; color: Theme.outlinerSubtext }
+                    Label { text: qsTr("Status"); font.bold: true; Layout.preferredWidth: ov.widths[3]; color: Theme.outlinerSubtext }
+                    Label { text: qsTr("Words"); font.bold: true; Layout.preferredWidth: ov.widths[4]; horizontalAlignment: Text.AlignRight; color: Theme.outlinerSubtext }
+                    Label { text: qsTr("Target"); font.bold: true; Layout.preferredWidth: ov.widths[5]; horizontalAlignment: Text.AlignRight; color: Theme.outlinerSubtext }
+                    Label { text: qsTr("Progress"); font.bold: true; Layout.preferredWidth: ov.widths[6]; color: Theme.outlinerSubtext }
                 }
             }
             delegate: Rectangle {
@@ -262,7 +262,7 @@ Rectangle {
                 required property int index
                 width: ov.tableWidth
                 height: Math.max(34, syn.implicitHeight + 10)
-                color: index % 2 ? Theme.panel : Theme.base
+                color: index % 2 ? Theme.outlinerAlternate : Theme.outlinerBackground
                 RowLayout {
                     // A folder shown only because something inside it matches.
                     opacity: r.modelData.context ? 0.5 : 1
@@ -280,13 +280,13 @@ Rectangle {
                         Label {
                             Layout.preferredWidth: 14
                             text: r.modelData.child_count > 0 && !ov.filtering ? (ov.collapsed[r.modelData.id] ? "▸" : "▾") : ""
-                            color: Theme.subtext
+                            color: Theme.outlinerSubtext
                             horizontalAlignment: Text.AlignHCenter
                             MouseArea { anchors.fill: parent; enabled: r.modelData.child_count > 0 && !ov.filtering; cursorShape: Qt.PointingHandCursor; onClicked: ov.toggle(r.modelData.id) }
                         }
                         KindIcon { kind: r.modelData.kind }
                         Label {
-                            text: r.modelData.title; color: Theme.text; elide: Text.ElideRight; Layout.fillWidth: true
+                            text: r.modelData.title; color: Theme.outlinerText; elide: Text.ElideRight; Layout.fillWidth: true
                             font.bold: r.modelData.kind === "folder"
                             MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onDoubleClicked: ov.openRequested(r.modelData.id) }
                         }
@@ -300,7 +300,7 @@ Rectangle {
                         text: r.modelData.synopsis
                         placeholderText: "—"
                         background: null
-                        color: Theme.text
+                        color: Theme.outlinerText
                         selectByMouse: true
                         onEditingFinished: if (text !== r.modelData.synopsis) Api.call("setField", r.modelData.id, "synopsis", text)
                     }
@@ -312,7 +312,7 @@ Rectangle {
                             text: ov.cellText(r.modelData, modelData)
                             placeholderText: "—"
                             background: null
-                            color: Theme.text
+                            color: Theme.outlinerText
                             selectByMouse: true
                             Component.onCompleted: cursorPosition = 0
                             onEditingFinished: ov.setCell(r.modelData, modelData, text)
@@ -330,7 +330,7 @@ Rectangle {
                         currentIndex: 1 + ov.meta.statuses.findIndex(s => s.id === r.modelData.status)
                         onActivated: (i) => Api.call("setField", r.modelData.id, "status", i === 0 ? "" : ov.meta.statuses[i - 1].id)
                     }
-                    Label { text: Api.fmtNumber(r.modelData.total_words); Layout.preferredWidth: ov.widths[4]; horizontalAlignment: Text.AlignRight; color: Theme.text }
+                    Label { text: Api.fmtNumber(r.modelData.total_words); Layout.preferredWidth: ov.widths[4]; horizontalAlignment: Text.AlignRight; color: Theme.outlinerText }
                     TextField {
                         Layout.preferredWidth: ov.widths[5]
                         text: r.modelData.target_words ? String(r.modelData.target_words) : ""
@@ -338,7 +338,7 @@ Rectangle {
                         horizontalAlignment: Text.AlignRight
                         validator: IntValidator { bottom: 0 }
                         background: null
-                        color: Theme.text
+                        color: Theme.outlinerText
                         onEditingFinished: Api.call("setField", r.modelData.id, "target_words", text)
                     }
                     ProgressBar {
@@ -358,7 +358,7 @@ Rectangle {
             Layout.topMargin: 4
             Layout.bottomMargin: 4
             elide: Text.ElideRight
-            color: Theme.subtext
+            color: Theme.outlinerSubtext
             font.pixelSize: Theme.px(12)
             text: ov.filtering
                 ? qsTr("%1 of %2 items match · %3 words in them").arg(ov.matchCount).arg(ov.allRows.length).arg(Api.fmtNumber(ov.matchWords))
@@ -369,12 +369,12 @@ Rectangle {
         anchors.centerIn: parent
         visible: ov.allRows.length > 0 && ov.filtering && ov.matchCount === 0
         text: qsTr("Nothing here matches the filter.")
-        color: Theme.subtext
+        color: Theme.outlinerSubtext
     }
     Label {
         anchors.centerIn: parent
         visible: ov.allRows.length === 0
         text: qsTr("Nothing below this item yet.")
-        color: Theme.subtext
+        color: Theme.outlinerSubtext
     }
 }

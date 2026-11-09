@@ -11,22 +11,123 @@ QtObject {
     readonly property bool dark: forced === "dark"
         || (forced === "" && Qt.styleHints.colorScheme === Qt.ColorScheme.Dark)
 
-    readonly property color window: dark ? "#1f2023" : "#f3f1ec"
-    readonly property color panel: dark ? "#26282c" : "#ebe8e1"
-    readonly property color base: dark ? "#2d2f34" : "#ffffff"
-    readonly property color text: dark ? "#e6e4df" : "#24231f"
-    readonly property color subtext: dark ? "#9c9a94" : "#77746c"
-    readonly property color border: dark ? "#3a3c42" : "#d6d2c8"
-    readonly property color accent: "#c0703a"
+    // Colours you've chosen (Preferences ▸ Colours), kept separately for
+    // the light and dark themes: JSON {"light": {role: "#rrggbb"}, "dark": {…}}.
+    // A role you haven't set follows its default below.
+    property string colourOverrides: "{}"
+    readonly property var allCustom: {
+        try { const o = JSON.parse(colourOverrides); return o && typeof o === "object" ? o : {}; }
+        catch (e) { return {}; }
+    }
+    readonly property string scheme: dark ? "dark" : "light"
+    readonly property var custom: allCustom[scheme] || {}
+    function pick(role, fallback) {
+        const c = custom[role];
+        return typeof c === "string" && /^#([0-9a-f]{6}|[0-9a-f]{8})$/i.test(c) ? c : fallback;
+    }
+    function isCustom(role) { return pick(role, "") !== ""; }
+    // Set (or, with an empty colour, reset) a role in the current theme.
+    function setColour(role, c) {
+        const all = JSON.parse(JSON.stringify(allCustom));
+        const mine = all[scheme] || {};
+        if (c === "" || c === undefined || c === null) delete mine[role];
+        else mine[role] = String(c);
+        if (Object.keys(mine).length) all[scheme] = mine; else delete all[scheme];
+        colourOverrides = JSON.stringify(all);
+    }
+    function resetColours(roles) {
+        if (!roles) { setColourMap({}); return; }
+        const mine = Object.assign({}, custom);
+        for (const r of roles) delete mine[r];
+        setColourMap(mine);
+    }
+    function setColourMap(mine) {
+        const all = JSON.parse(JSON.stringify(allCustom));
+        if (Object.keys(mine).length) all[scheme] = mine; else delete all[scheme];
+        colourOverrides = JSON.stringify(all);
+    }
+
+    // The interface as a whole: every view and dialog.
+    readonly property color window: pick("window", dark ? "#1f2023" : "#f3f1ec")
+    readonly property color panel: pick("panel", dark ? "#26282c" : "#ebe8e1")
+    readonly property color base: pick("base", dark ? "#2d2f34" : "#ffffff")
+    readonly property color text: pick("text", dark ? "#e6e4df" : "#24231f")
+    readonly property color subtext: pick("subtext", dark ? "#9c9a94" : "#77746c")
+    readonly property color border: pick("border", dark ? "#3a3c42" : "#d6d2c8")
+    readonly property color accent: pick("accent", "#c0703a")
     readonly property color accentSoft: dark ? "#4a3626" : "#f3dfcf"
-    readonly property color selection: dark ? "#3e4a5c" : "#d7e3f4"
+    readonly property color selection: pick("selection", dark ? "#3e4a5c" : "#d7e3f4")
     readonly property color danger: "#d64545"
     readonly property color ok: "#5a9e5a"
-    readonly property color cork: dark ? "#3b342b" : "#c9a97c"
-    readonly property color card: dark ? "#34363b" : "#fffdf5"
-    readonly property color cardLine: dark ? "#43464d" : "#e6eef7"
-    readonly property color paper: dark ? "#25272b" : "#fffefb"
-    readonly property color ink: dark ? "#dcd9d2" : "#1d1c19"
+    // The editor's page (also the reader and Compare).
+    readonly property color paper: pick("paper", dark ? "#25272b" : "#fffefb")
+    readonly property color ink: pick("ink", dark ? "#dcd9d2" : "#1d1c19")
+    readonly property color editorBackground: pick("editorBackground", window)
+    readonly property color editorSelection: pick("editorSelection", selection)
+    readonly property color editorSelectedText: pick("editorSelectedText", ink)
+    // Corkboards and index cards.
+    readonly property color cork: pick("cork", dark ? "#3b342b" : "#c9a97c")
+    readonly property color card: pick("card", dark ? "#34363b" : "#fffdf5")
+    readonly property color cardLine: pick("cardLine", dark ? "#43464d" : "#e6eef7")
+    readonly property color cardText: pick("cardText", ink)
+    readonly property color cardSubtext: pick("cardSubtext", subtext)
+    // The binder.
+    readonly property color binderBackground: pick("binderBackground", panel)
+    readonly property color binderText: pick("binderText", text)
+    readonly property color binderSubtext: pick("binderSubtext", subtext)
+    readonly property color binderSelection: pick("binderSelection", selection)
+    // The Details panel.
+    readonly property color detailsBackground: pick("detailsBackground", panel)
+    readonly property color detailsText: pick("detailsText", text)
+    readonly property color detailsSubtext: pick("detailsSubtext", subtext)
+    readonly property color detailsField: pick("detailsField", card)
+    readonly property color detailsFieldText: pick("detailsFieldText", ink)
+    // The outliner.
+    readonly property color outlinerBackground: pick("outlinerBackground", base)
+    readonly property color outlinerAlternate: pick("outlinerAlternate", panel)
+    readonly property color outlinerText: pick("outlinerText", text)
+    readonly property color outlinerSubtext: pick("outlinerSubtext", subtext)
+
+    // What Preferences ▸ Colours lists, area by area.
+    readonly property var colourAreas: [
+        { name: qsTr("Interface"), note: qsTr("Menus, panels, dialogs and every view; the areas below start from these."), roles: [
+            { role: "window", name: qsTr("Window background") },
+            { role: "panel", name: qsTr("Panels and toolbars") },
+            { role: "base", name: qsTr("Fields and lists") },
+            { role: "text", name: qsTr("Text") },
+            { role: "subtext", name: qsTr("Secondary text") },
+            { role: "border", name: qsTr("Borders") },
+            { role: "accent", name: qsTr("Accent and highlights") },
+            { role: "selection", name: qsTr("Selection") } ] },
+        { name: qsTr("Binder"), roles: [
+            { role: "binderBackground", name: qsTr("Background") },
+            { role: "binderText", name: qsTr("Titles") },
+            { role: "binderSubtext", name: qsTr("Word counts and headings") },
+            { role: "binderSelection", name: qsTr("Selected item") } ] },
+        { name: qsTr("Details"), roles: [
+            { role: "detailsBackground", name: qsTr("Background") },
+            { role: "detailsText", name: qsTr("Text") },
+            { role: "detailsSubtext", name: qsTr("Field names") },
+            { role: "detailsField", name: qsTr("Synopsis and notes background") },
+            { role: "detailsFieldText", name: qsTr("Synopsis and notes text") } ] },
+        { name: qsTr("Editor"), roles: [
+            { role: "editorBackground", name: qsTr("Around the page") },
+            { role: "paper", name: qsTr("Page") },
+            { role: "ink", name: qsTr("Text") },
+            { role: "editorSelection", name: qsTr("Selection") },
+            { role: "editorSelectedText", name: qsTr("Selected text") } ] },
+        { name: qsTr("Corkboard"), note: qsTr("A board's own colour, set from its bar, takes the place of the board colour."), roles: [
+            { role: "cork", name: qsTr("Board") },
+            { role: "card", name: qsTr("Index cards") },
+            { role: "cardText", name: qsTr("Card text") },
+            { role: "cardSubtext", name: qsTr("Card details") },
+            { role: "cardLine", name: qsTr("Ruled lines") } ] },
+        { name: qsTr("Outliner"), roles: [
+            { role: "outlinerBackground", name: qsTr("Background") },
+            { role: "outlinerAlternate", name: qsTr("Header and alternate rows") },
+            { role: "outlinerText", name: qsTr("Text") },
+            { role: "outlinerSubtext", name: qsTr("Secondary text") } ] }
+    ]
 
     // The interface font (Preferences ▸ Interface): menus, panels, dialogs,
     // the binder, cards and lists. "" and 0 follow the system. The editor
@@ -127,6 +228,7 @@ QtObject {
         property alias lineHighlight: theme.lineHighlight
         property alias highlightRepeats: theme.highlightRepeats
         property alias lineHighlightColor: theme.lineHighlightColor
+        property alias colourOverrides: theme.colourOverrides
     }
 
     readonly property int gap: 8

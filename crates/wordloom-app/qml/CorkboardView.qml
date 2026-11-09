@@ -853,7 +853,7 @@ Rectangle {
                     text: face.modelData.title
                     placeholderText: face.isNote ? qsTr("Note") : ""
                     font.bold: true
-                    color: Theme.ink
+                    color: Theme.cardText
                     background: null
                     padding: 0
                     selectByMouse: true
@@ -874,7 +874,7 @@ Rectangle {
                 wrapMode: TextEdit.Wrap
                 font.family: Theme.editorFont
                 font.pixelSize: Theme.px(13)
-                color: Theme.ink
+                color: Theme.cardText
                 background: null
                 padding: 0
                 selectByMouse: true
@@ -893,9 +893,9 @@ Rectangle {
                 Item { Layout.fillWidth: true }
                 Label {
                     text: face.isNote ? "" : Api.fmtNumber(face.modelData.total_words) + (face.modelData.target_words ? "/" + Api.fmtNumber(face.modelData.target_words) : "") + qsTr(" w")
-                    color: Theme.subtext; font.pixelSize: Theme.px(10)
+                    color: Theme.cardSubtext; font.pixelSize: Theme.px(10)
                 }
-                Label { visible: face.modelData.child_count > 0; text: "▤ " + face.modelData.child_count; color: Theme.subtext; font.pixelSize: Theme.px(10) }
+                Label { visible: face.modelData.child_count > 0; text: "▤ " + face.modelData.child_count; color: Theme.cardSubtext; font.pixelSize: Theme.px(10) }
             }
         }
 
@@ -1079,7 +1079,7 @@ Rectangle {
         border.color: Theme.accent
         opacity: 0.9
         z: 6
-        Label { anchors.fill: parent; anchors.margins: 6; text: cb.dragTitle; elide: Text.ElideRight; font.bold: true; color: Theme.ink; verticalAlignment: Text.AlignVCenter }
+        Label { anchors.fill: parent; anchors.margins: 6; text: cb.dragTitle; elide: Text.ElideRight; font.bold: true; color: Theme.cardText; verticalAlignment: Text.AlignVCenter }
     }
 
     Label {
