@@ -223,6 +223,8 @@ Notable changes to Wordloom. Each entry lands in the same commit as the change i
   `Cargo.lock`), as Flathub requires, and the AppStream metadata has screenshots.
 
 ### Fixed
+- Dropping a card into a folder on a freeform corkboard, and switching a board between grid and
+  freeform, no longer print errors (the dropped card's handler ran on after the card had gone).
 - No more "binding loop" warnings on Qt 6.8. They came from the editor's page while a project
   opened or closed, and from the About dialog when the interface font changed.
 - **+ Note** puts the caret in the new note at once. It used to arrive a moment later, so keys

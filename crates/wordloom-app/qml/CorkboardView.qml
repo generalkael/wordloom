@@ -623,7 +623,9 @@ Rectangle {
             cellHeight: cb.cardHeight + 16
             model: cb.freeform ? [] : cb.items
             ScrollBar.vertical: ScrollBar {}
-            activeFocusOnTab: !cb.freeform
+            // Always on: Tab skips whichever view is hidden, and turning it off
+            // while the view has the focus isn't allowed.
+            activeFocusOnTab: true
             Keys.onPressed: (e) => { if (cb.handleKey(e)) e.accepted = true; }
             WheelHandler { acceptedModifiers: Qt.ControlModifier; onWheel: (e) => cb.zoomWheel(e) }
             // Shows that the keys go to the board.
@@ -671,7 +673,9 @@ Rectangle {
             contentHeight: Math.max(height, freeContent.extentY + cb.cardHeight)
             ScrollBar.vertical: ScrollBar {}
             ScrollBar.horizontal: ScrollBar {}
-            activeFocusOnTab: cb.freeform
+            // Always on: Tab skips whichever view is hidden, and turning it off
+            // while the view has the focus isn't allowed.
+            activeFocusOnTab: true
             interactive: false   // the mouse is for moving cards; wheel and scroll bars scroll
             Keys.onPressed: (e) => { if (cb.handleKey(e)) e.accepted = true; }
             WheelHandler {
@@ -918,9 +922,13 @@ Rectangle {
             onActiveChanged: {
                 if (face.mover) {
                     if (active) { cb.keyId = face.modelData.id; cb.startGroupDrag(face.modelData.id); return; }
-                    const m = face.mover;
-                    cb.finishFreeDrag(face.modelData.id, m.x, m.y);
-                    if (m) m.rebind();
+                    // Follow the board again before saving the drop: saving
+                    // reloads the board at once (so the card is never drawn
+                    // back where it was), and that can destroy this card
+                    // (dropped into a folder), along with this handler.
+                    const m = face.mover, id = face.modelData.id, x = m.x, y = m.y;
+                    m.rebind();
+                    cb.finishFreeDrag(id, x, y);
                 } else if (active) cb.startDrag(face.modelData.id, face.modelData.title || (face.isNote ? (face.modelData.text.split("\n")[0] || qsTr("Note")) : ""));
                 else cb.finishDrag();
             }

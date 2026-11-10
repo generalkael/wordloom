@@ -170,7 +170,11 @@ flatpak run io.github.generalkael.Wordloom
 ```
 
 To build them yourself, run `packaging/linux/build-appimage.sh` (it downloads linuxdeploy into
-`.appimage-tools/`), or
+`.appimage-tools/`). linuxdeploy bundles every Qt plugin it finds, so a distribution Qt with extra
+image plugins (KDE's, for instance) can stop it with "Could not find dependency"; point it at a
+plain Qt from the Qt installer or `aqt` instead, with `QMAKE=<qt>/bin/qmake` and
+`LD_LIBRARY_PATH=<qt>/lib`. On distributions newer than linuxdeploy's own tools, add `NO_STRIP=1`
+if `strip` fails with "unknown type [0x13] section `.relr.dyn'". Or
 `flatpak-builder --user --install --install-deps-from=flathub --force-clean build-dir packaging/flatpak/io.github.generalkael.Wordloom.yml`.
 The desktop entry, icon and AppStream metadata are in `packaging/linux/` and use the app ID
 `io.github.generalkael.Wordloom`.
