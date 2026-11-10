@@ -81,6 +81,12 @@ Rectangle {
         return it ? it.mapToItem(null, it.width / 2, it.height / 2) : null;
     }
     function setPicked(field, value) { Api.call("setFieldMany", pickedIds(), field, value); }
+    // Icon & Colour… for these items.
+    LookDialog { id: lookDialog }
+    function editLook(ids) { lookDialog.openFor(ids); }
+    function lookDialogRef() { return lookDialog; }
+    // The row showing item `id` (scrolled into view), or null.
+    function rowItem(id) { const i = rowIndex(id); if (i < 0) return null; list.positionViewAtIndex(i, ListView.Contain); return list.itemAtIndex(i); }
     function rowIndex(id) { for (let i = 0; i < rows.length; ++i) if (rows[i].id === id) return i; return -1; }
     function startRename(id) { renamingId = id; const i = rowIndex(id); if (i >= 0) list.positionViewAtIndex(i, ListView.Contain); }
     function focusSearch() { searchField.forceActiveFocus(); searchField.selectAll(); }
@@ -139,6 +145,14 @@ Rectangle {
                     required property var modelData
                     width: favBox.width
                     height: Theme.px(26)
+                    readonly property var look: modelData.look || {}
+                    Rectangle {
+                        anchors.fill: parent
+                        anchors.leftMargin: 4
+                        anchors.rightMargin: 4
+                        radius: 4
+                        color: fav.look.row_color || "transparent"
+                    }
                     Rectangle {
                         anchors.fill: parent
                         anchors.leftMargin: 4
@@ -152,8 +166,8 @@ Rectangle {
                         anchors.leftMargin: 14
                         anchors.rightMargin: 8
                         spacing: 4
-                        KindIcon { kind: fav.modelData.kind; role: "" }
-                        Label { text: fav.modelData.title; color: Theme.binderText; elide: Text.ElideRight; Layout.fillWidth: true }
+                        KindIcon { kind: fav.modelData.kind; role: ""; icon: fav.look.icon || ""; tint: fav.look.icon_color || "" }
+                        Label { text: fav.modelData.title; color: fav.look.text_color || Theme.binderText; elide: Text.ElideRight; Layout.fillWidth: true }
                     }
                     ToolTip.visible: favHover.hovered && fav.modelData.where !== ""
                     ToolTip.delay: 600
@@ -217,7 +231,21 @@ Rectangle {
                 readonly property bool isCurrent: modelData.id === pane.currentId
                 readonly property bool isPicked: pane.pickCount > 0 && !!pane.picked[modelData.id]
                 readonly property bool isRoot: modelData.role !== null && modelData.role !== undefined
+                // Its own icon and colours (Icon & Colour…).
+                readonly property var look: modelData.look || {}
 
+                // (The self-test checks these.)
+                property alias iconItem: rowIcon
+                property alias titleItem: rowTitle
+                property alias backgroundItem: rowBackground
+                Rectangle {
+                    id: rowBackground
+                    anchors.fill: parent
+                    anchors.leftMargin: 4
+                    anchors.rightMargin: 4
+                    radius: 4
+                    color: row.look.row_color || "transparent"
+                }
                 Rectangle {
                     anchors.fill: parent
                     anchors.leftMargin: 4
@@ -258,7 +286,7 @@ Rectangle {
                             onClicked: Api.call("toggleExpanded", row.modelData.id)
                         }
                     }
-                    KindIcon { kind: row.modelData.kind; role: row.modelData.role || "" }
+                    KindIcon { id: rowIcon; kind: row.modelData.kind; role: row.modelData.role || ""; icon: row.look.icon || ""; tint: row.look.icon_color || "" }
                     Rectangle {
                         visible: !!row.modelData.label_color
                         width: 8; height: 8; radius: 4
@@ -266,8 +294,9 @@ Rectangle {
                     }
                     Label {
                         visible: pane.renamingId !== row.modelData.id
+                        id: rowTitle
                         text: row.modelData.title
-                        color: Theme.binderText
+                        color: row.look.text_color || Theme.binderText
                         font.bold: row.isRoot
                         elide: Text.ElideRight
                         Layout.fillWidth: true
@@ -384,6 +413,7 @@ Rectangle {
                     MenuSeparator {}
                     MenuItem { text: row.modelData.favorite ? qsTr("Remove from Favourites") : qsTr("Add to Favourites"); enabled: !row.isRoot; onTriggered: pane.setFavorite(row.modelData.id, !row.modelData.favorite) }
                     MenuItem { text: qsTr("Rename"); enabled: !row.isRoot; onTriggered: pane.startRename(row.modelData.id) }
+                    MenuItem { text: qsTr("Icon && Colour…"); onTriggered: pane.editLook([row.modelData.id]) }
                     MenuItem { text: qsTr("Duplicate"); enabled: !row.isRoot; onTriggered: Api.call("duplicate", row.modelData.id) }
                     MenuItem { text: qsTr("Move Up"); enabled: !row.isRoot; onTriggered: Api.call("shift", row.modelData.id, -1) }
                     MenuItem { text: qsTr("Move Down"); enabled: !row.isRoot; onTriggered: Api.call("shift", row.modelData.id, 1) }
@@ -437,6 +467,7 @@ Rectangle {
                 onObjectRemoved: (i, o) => pickStatuses.removeItem(o)
             }
         }
+        MenuItem { text: qsTr("Icon && Colour…"); onTriggered: pane.editLook(pane.pickedIds()) }
         MenuItem { text: qsTr("Include in Compile"); onTriggered: pane.setPicked("include_in_compile", true) }
         MenuItem { text: qsTr("Exclude from Compile"); onTriggered: pane.setPicked("include_in_compile", false) }
         MenuSeparator {}

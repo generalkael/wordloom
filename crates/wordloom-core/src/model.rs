@@ -150,6 +150,11 @@ pub struct Node {
     /// the bundle's `files/` directory.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub file: Option<String>,
+    /// How the item looks in the binder: an icon in place of its kind's
+    /// (a name from the app's icon set), the icon's colour, and the colour
+    /// of its title and of its row (`#rrggbb` or `#aarrggbb`).
+    #[serde(default, skip_serializing_if = "Look::is_empty")]
+    pub look: Look,
     pub created: DateTime<Utc>,
     pub modified: DateTime<Utc>,
 }
@@ -179,10 +184,46 @@ impl Node {
             expanded: true,
             favorite: false,
             file: None,
+            look: Look::default(),
             created: now,
             modified: now,
         }
     }
+}
+
+/// A binder item's own icon and colours ([`Node::look`]); `None` follows
+/// the defaults.
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Hash, Default)]
+pub struct Look {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub icon: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub icon_color: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub text_color: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub row_color: Option<String>,
+}
+
+impl Look {
+    pub fn is_empty(&self) -> bool {
+        *self == Look::default()
+    }
+}
+
+/// `#rrggbb` or `#aarrggbb` (Qt's order, alpha first).
+pub fn is_colour(s: &str) -> bool {
+    let h = s.strip_prefix('#').unwrap_or("");
+    (h.len() == 6 || h.len() == 8) && h.chars().all(|c| c.is_ascii_hexdigit())
+}
+
+/// An icon name: lowercase letters, digits and dashes, as the app's icon
+/// set uses. (Names the app doesn't know fall back to the kind's icon.)
+pub fn is_icon_name(s: &str) -> bool {
+    !s.is_empty()
+        && s.len() <= 32
+        && s.chars()
+            .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
@@ -246,6 +287,7 @@ pub struct FlatRow {
     pub expanded: bool,
     pub favorite: bool,
     pub label_color: Option<String>,
+    pub look: Look,
     /// Word target, and words so far (this item and everything inside it);
     /// `words` is only filled in when there is a target.
     pub target_words: Option<u32>,
@@ -649,6 +691,7 @@ impl Project {
             expanded: n.expanded,
             favorite: n.favorite,
             label_color: n.label.and_then(|l| self.label(l)).map(|l| l.color.clone()),
+            look: n.look.clone(),
             target_words: n.target_words,
             words: n.target_words.map(|_| self.total_words(id)),
         });

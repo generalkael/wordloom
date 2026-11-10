@@ -43,6 +43,9 @@ fn colour_print(p: &crate::model::Project) -> u64 {
             (n.id, &n.color).hash(&mut h);
         }
     }
+    for n in p.nodes.values() {
+        (n.id, &n.look).hash(&mut h);
+    }
     let t = &p.timeline;
     for tr in &t.tracks {
         (tr.id, &tr.color).hash(&mut h);
@@ -197,6 +200,11 @@ fn undo_label(method: &str, a: &Args) -> Option<(String, Option<String>)> {
                 "include_in_compile" => "Include in Compile".into(),
                 "target_words" => "Set Word Target".into(),
                 "kind" => "Convert".into(),
+                "icon" => "Change Icon".into(),
+                "icon_color" => "Change Icon Colour".into(),
+                "text_color" => "Change Text Colour".into(),
+                "row_color" => "Change Background".into(),
+                "look" => "Reset Icon & Colours".into(),
                 f => match f.strip_prefix("field:") {
                     Some(k) => format!("Edit {k}"),
                     None => "Edit".into(),
@@ -260,6 +268,11 @@ fn undo_label(method: &str, a: &Args) -> Option<(String, Option<String>)> {
             let label = match a.str(1) {
                 "label" => "Change Label",
                 "status" => "Change Status",
+                "icon" => "Change Icon",
+                "icon_color" => "Change Icon Colour",
+                "text_color" => "Change Text Colour",
+                "row_color" => "Change Background",
+                "look" => "Reset Icon & Colours",
                 _ => "Include in Compile",
             };
             return Some((format!("{label} ({} items)", a.strs(0).len()), None));
@@ -1148,6 +1161,114 @@ mod tests {
             &json!([id, "First draft", "#ab1234"]).to_string(),
         ));
         assert!(dirty(&app));
+    }
+
+    #[test]
+    fn binder_items_take_an_icon_and_colours() {
+        let tmp = tempfile::tempdir().unwrap();
+        let mut app = App::new(tmp.path().join("recent.json"));
+        let url = url::Url::from_file_path(tmp.path()).unwrap().to_string();
+        ok(&app.call("newProject", &json!([url, "Book", "Me"]).to_string()));
+        let on_disk =
+            || std::fs::read_to_string(tmp.path().join("Book.wordloom/project.json")).unwrap();
+        let ms = ok(&app.call("rootId", r#"["manuscript"]"#));
+        let folder = ok(&app.call("add", &json!([ms, "folder", "Part", true]).to_string()));
+        let a = ok(&app.call("add", &json!([folder, "text", "A", true]).to_string()));
+        let look = |app: &mut App, id: &Value| {
+            ok(&app.call("nodeInfo", &json!([id]).to_string()))["look"].clone()
+        };
+        let row = |app: &mut App, id: &Value| {
+            ok(&app.call("binder", ""))
+                .as_array()
+                .unwrap()
+                .iter()
+                .find(|r| &r["id"] == id)
+                .unwrap()["look"]
+                .clone()
+        };
+        assert_eq!(
+            look(&mut app, &folder),
+            json!({}),
+            "nothing set to begin with"
+        );
+        assert!(
+            !on_disk().contains("\"look\""),
+            "and nothing written for it"
+        );
+
+        ok(&app.call("setField", &json!([folder, "icon", "star"]).to_string()));
+        ok(&app.call(
+            "setField",
+            &json!([folder, "icon_color", "#D64545"]).to_string(),
+        ));
+        ok(&app.call(
+            "setField",
+            &json!([folder, "text_color", "#112233"]).to_string(),
+        ));
+        ok(&app.call(
+            "setField",
+            &json!([folder, "row_color", "#4d5a9e5a"]).to_string(),
+        ));
+        assert_eq!(
+            row(&mut app, &folder),
+            json!({"icon": "star", "icon_color": "#d64545", "text_color": "#112233", "row_color": "#4d5a9e5a"}),
+            "the binder rows carry them"
+        );
+        assert!(on_disk().contains("#4d5a9e5a"), "colours are saved at once");
+        assert_eq!(app.undo_redo().0.as_deref(), Some("Change Background"));
+
+        // Bad values are refused and change nothing.
+        for (f, v) in [
+            ("icon", "Star!"),
+            ("icon_color", "red"),
+            ("row_color", "#12345"),
+            ("text_color", "#gggggg"),
+        ] {
+            assert!(
+                app.call("setField", &json!([folder, f, v]).to_string())
+                    .error
+                    .is_some(),
+                "{f} = {v}"
+            );
+        }
+        assert_eq!(look(&mut app, &folder)["icon"], "star");
+
+        // Undo takes back one change at a time.
+        ok(&app.call("undo", ""));
+        assert!(look(&mut app, &folder).get("row_color").is_none());
+        assert_eq!(look(&mut app, &folder)["text_color"], "#112233");
+
+        // Several at once, and resetting everything.
+        assert_eq!(
+            ok(&app.call(
+                "setFieldMany",
+                &json!([[folder, a], "icon_color", "#5a9e5a"]).to_string()
+            )),
+            2
+        );
+        assert_eq!(look(&mut app, &a)["icon_color"], "#5a9e5a");
+        assert_eq!(
+            app.undo_redo().0.as_deref(),
+            Some("Change Icon Colour (2 items)")
+        );
+        ok(&app.call("setField", &json!([folder, "icon", ""]).to_string()));
+        assert!(
+            look(&mut app, &folder).get("icon").is_none(),
+            "an empty icon goes back to the kind's"
+        );
+        ok(&app.call("setField", &json!([folder, "look", "{}"]).to_string()));
+        assert_eq!(look(&mut app, &folder), json!({}));
+        assert!(app
+            .call(
+                "setField",
+                &json!([folder, "look", r#"{"icon_color":"blue"}"#]).to_string()
+            )
+            .error
+            .is_some());
+        // A copy looks the same.
+        ok(&app.call("setField", &json!([a, "icon", "heart"]).to_string()));
+        let copy = ok(&app.call("duplicate", &json!([a]).to_string()));
+        assert_eq!(look(&mut app, &copy)["icon"], "heart");
     }
 
     #[test]

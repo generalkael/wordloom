@@ -1039,6 +1039,43 @@ Item {
             input.key(win, Qt.Key_D, Qt.ControlModifier | Qt.ShiftModifier);
             check(ws().binderRef().favorites.length === 0, "Ctrl+Shift+D again takes it off the list");
         }],
+        ["icon and colour", () => {
+            const b = ws().binderRef(), id = rowId("The Storm"), ld = b.lookDialogRef();
+            const r0 = b.rowItem(id);
+            check(r0 && r0.iconItem.status === Image.Ready && !r0.iconItem.custom && Qt.colorEqual(r0.backgroundItem.color, "transparent"),
+                "a folder starts with its usual icon and no background");
+            b.editLook([id]);
+            check(ld.visible && ld.node && ld.node.title === "The Storm", "Icon & Colour… opens for the item");
+            check(ld.set("icon", "star") && ld.set("icon_color", "#d64545") && ld.set("text_color", "#4a7fc7") && ld.set("row_color", Icons.rowSwatch("#5a9e5a")),
+                "the icon and each colour can be chosen");
+            check(!ld.set("icon_color", "not a colour"), "a bad colour is refused");
+        }],
+        ["icon and colour", () => {
+            const st = ws().binderRef().lookDialogRef().iconStates();
+            check(st.ready === Icons.choices.length + 1 && st.bad.length === 0, "every icon on offer shows in the chosen colour (" + st.ready + " ready; " + st.bad.join(" ") + ")");
+        }],
+        ["icon and colour", () => {
+            const b = ws().binderRef(), id = rowId("The Storm"), ld = b.lookDialogRef(), r = b.rowItem(id);
+            check(r && r.iconItem.custom && r.iconItem.status === Image.Ready && String(r.iconItem.source).startsWith("data:image/svg+xml"),
+                "the binder draws the chosen icon in its colour (" + (r ? r.iconItem.status : "no row") + ")");
+            check(r && Qt.colorEqual(r.titleItem.color, "#4a7fc7") && Qt.colorEqual(r.backgroundItem.color, "#4d5a9e5a"),
+                "and the title and row in theirs (" + (r ? r.titleItem.color + " " + r.backgroundItem.color : "") + ")");
+            check(Api.get("nodeInfo", null, id).look.icon === "star" && !Wordloom.dirty, "it's saved with the project at once");
+            check(Icons.choices.every(n => Icons.set[n] && Icons.url(n, "#336699").startsWith("data:")), "every icon on offer can be drawn in any colour (" + Icons.choices.length + ")");
+            // Undo takes back one change at a time.
+            Api.call("undo");
+            check(!Api.get("nodeInfo", null, id).look.row_color && Api.get("nodeInfo", null, id).look.text_color === "#4a7fc7", "Undo takes back the last change only");
+            // Several at once (the binder's multi-selection).
+            const a = rowId("Arrival"), k = rowId("The Keeper");
+            b.editLook([a, k]);
+            check(ld.ids.length === 2 && ld.set("icon_color", "#8a63b8"), "several items can be changed together");
+            check([a, k].every(x => Api.get("nodeInfo", null, x).look.icon_color === "#8a63b8"), "and all of them change");
+            check(ld.resetAll() && [a, k].every(x => Object.keys(Api.get("nodeInfo", null, x).look).length === 0), "Reset All takes them back to normal");
+            b.editLook([id]);
+            ld.resetAll();
+            check(Object.keys(Api.get("nodeInfo", null, id).look).length === 0, "and so for one item");
+            ld.close();
+        }],
         ["sprint", () => {
             ws().select(rowId("Arrival"), "editor");
             sprint.durationMin = 1; sprint.goal = 3; sprint.start();

@@ -32,10 +32,16 @@ const QML: &[&str] = &[
     "qml/KindIcon.qml",
     "qml/ShortcutsPage.qml",
     "qml/SavedSettings.qml",
+    "qml/LookDialog.qml",
 ];
 
 /// `pragma Singleton` QML files.
-const SINGLETONS: &[&str] = &["qml/Theme.qml", "qml/Api.qml", "qml/Shortcuts.qml"];
+const SINGLETONS: &[&str] = &[
+    "qml/Theme.qml",
+    "qml/Api.qml",
+    "qml/Shortcuts.qml",
+    "qml/Icons.qml",
+];
 
 fn main() {
     let mut files: Vec<QmlFile> = QML.iter().map(QmlFile::from).collect();

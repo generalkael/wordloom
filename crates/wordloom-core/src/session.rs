@@ -327,7 +327,7 @@ impl Session {
                     path.drain(1..path.len() - 1);
                     path.insert(1, "…");
                 }
-                json!({"id": id, "title": n.title, "kind": n.kind, "where": path.join(" › ")})
+                json!({"id": id, "title": n.title, "kind": n.kind, "look": n.look, "where": path.join(" › ")})
             })
             .collect();
         json!(rows)
@@ -376,6 +376,7 @@ impl Session {
             "target_words": n.target_words,
             "fields": n.fields,
             "favorite": n.favorite,
+            "look": n.look,
             "file": n.file.as_ref().map(|f| self.file_info(f)),
             "words": p.own_words(id),
             "total_words": p.total_words(id),
@@ -659,6 +660,42 @@ impl Session {
             }
             "include_in_compile" => n.include_in_compile = value == "true",
             "target_words" => n.target_words = value.trim().parse().ok().filter(|v| *v > 0),
+            "icon" => {
+                let v = value.trim();
+                if !v.is_empty() && !crate::model::is_icon_name(v) {
+                    return Err(Error::Invalid(format!("bad icon name {v}")));
+                }
+                n.look.icon = (!v.is_empty()).then(|| v.to_string());
+            }
+            "icon_color" | "text_color" | "row_color" => {
+                let v = value.trim();
+                if !v.is_empty() && !crate::model::is_colour(v) {
+                    return Err(Error::Invalid(format!("bad colour {v}")));
+                }
+                let v = (!v.is_empty()).then(|| v.to_lowercase());
+                match field {
+                    "icon_color" => n.look.icon_color = v,
+                    "text_color" => n.look.text_color = v,
+                    _ => n.look.row_color = v,
+                }
+            }
+            "look" => {
+                // Every part at once, as JSON ({} resets them all).
+                let look: crate::model::Look = if value.trim().is_empty() {
+                    Default::default()
+                } else {
+                    serde_json::from_str(value)
+                        .map_err(|e| Error::Invalid(format!("bad look: {e}")))?
+                };
+                let ok = look.icon.as_deref().is_none_or(crate::model::is_icon_name)
+                    && [&look.icon_color, &look.text_color, &look.row_color]
+                        .iter()
+                        .all(|c| c.as_deref().is_none_or(crate::model::is_colour));
+                if !ok {
+                    return Err(Error::Invalid("bad icon or colour".into()));
+                }
+                n.look = look;
+            }
             "kind" if !is_root => {
                 n.kind = NodeKind::parse(value).ok_or_else(|| Error::Invalid("bad kind".into()))?
             }
@@ -755,7 +792,17 @@ impl Session {
     /// (the binder's multi-selection). All the ids are checked first, so
     /// either every item changes or none does.
     pub fn set_field_many(&mut self, ids: &[String], field: &str, value: &str) -> Result<usize> {
-        if !matches!(field, "label" | "status" | "include_in_compile") {
+        if !matches!(
+            field,
+            "label"
+                | "status"
+                | "include_in_compile"
+                | "icon"
+                | "icon_color"
+                | "text_color"
+                | "row_color"
+                | "look"
+        ) {
             return Err(Error::Invalid(format!(
                 "{field} can't be set on several items at once"
             )));
