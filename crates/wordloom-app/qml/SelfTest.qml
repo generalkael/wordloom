@@ -993,16 +993,21 @@ Item {
             win.openPath(meta.path);
             check(Api.get("meta", null).path === meta.path, "the original opens again");
         }],
+        // Places are recorded once events have run (Qt.callLater), so changes
+        // in one go count as one place. On a slow machine the next step can
+        // come first, merging two places; so each place is recorded here as
+        // soon as it's chosen (recordNav ignores a place it already has).
         ["back and forward", () => {
             win.requestActivate();
             ws().select(rowId("Arrival"), "editor");
+            ws().recordNav();
             const a = ed().firstArea();
             a.forceActiveFocus();
             a.cursorPosition = 7;
             ws().select(rowId("The Storm"), "corkboard");
+            ws().recordNav();
         }],
-        // (One step per place: changes in one go count as one place.)
-        ["back and forward", () => { ws().select(rowId("The Keeper")); }],
+        ["back and forward", () => { ws().select(rowId("The Keeper")); ws().recordNav(); }],
         ["back and forward", () => {
             check(ws().canGoBack && !ws().canGoForward, "places visited are remembered");
             ed().firstArea().forceActiveFocus();
@@ -1090,8 +1095,8 @@ Item {
         }],
         ["icon and colour on cards and rows", () => {
             const cb = ws().corkboardRef(), f = cb.cardItem(rowId("Arrival"));
-            check(f && f.cardIcon.custom && f.cardIcon.status === Image.Ready && Qt.colorEqual(f.cardTitle.color, "#d64545") && Qt.colorEqual(f.cardTint.color, "#4d4a7fc7"),
-                "a corkboard card shows the item's icon and colours" + (f ? " (" + f.cardTitle.color + " " + f.cardTint.color + ")" : " (no card)"));
+            check(f && f.cardIcon.custom && Qt.colorEqual(f.cardTitle.color, "#d64545") && Qt.colorEqual(f.cardTint.color, "#4d4a7fc7"),
+                "a corkboard card shows the item's icon and colours" + (f ? " (" + f.cardIcon.icon + " " + f.cardTitle.color + " " + f.cardTint.color + ")" : " (no card)"));
             const other = cb.cardItem(rowId("The Keeper"));
             check(other && !other.cardIcon.custom && Qt.colorEqual(other.cardTint.color, "transparent"), "and the others look as usual");
             check(JSON.stringify(cb.lookIds(rowId("Arrival"))) === JSON.stringify([rowId("Arrival")]), "Icon & Colour… on a card is for that card");
@@ -1101,6 +1106,11 @@ Item {
             ld.set("text_color", "#5a9e5a");
             check(Qt.colorEqual(cb.cardItem(rowId("The Keeper")).cardTitle.color, "#5a9e5a"), "a change shows on the card at once");
             ld.close();
+        }],
+        ["icon and colour on cards and rows", () => {
+            // (A step later: on a slow machine the card's image may still be loading.)
+            const f = ws().corkboardRef().cardItem(rowId("Arrival"));
+            check(f && f.cardIcon.status === Image.Ready, "the card's icon is drawn (" + (f ? "status " + f.cardIcon.status + ", " + String(f.cardIcon.source).substring(0, 30) : "no card") + ")");
             ws().select(rowId("The Storm"), "outliner");
         }],
         ["icon and colour on cards and rows", () => {
