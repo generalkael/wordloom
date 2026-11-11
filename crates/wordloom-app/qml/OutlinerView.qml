@@ -28,6 +28,15 @@ Rectangle {
         return Object.keys(keys).sort((a, b) => a.localeCompare(b));
     }
     signal openRequested(string id)
+    // Icon & Colour… for an item (Workspace opens the binder's dialog).
+    signal lookRequested(var ids)
+    // The row showing item `id`, or null (the self-test).
+    function rowItem(id) {
+        const i = rows.findIndex(x => x.id === id);
+        if (i < 0) return null;
+        list.positionViewAtIndex(i, ListView.Contain);
+        return list.itemAtIndex(i);
+    }
 
     SavedSettings {
         category: "outliner"
@@ -263,6 +272,18 @@ Rectangle {
                 width: ov.tableWidth
                 height: Math.max(34, syn.implicitHeight + 10)
                 color: index % 2 ? Theme.outlinerAlternate : Theme.outlinerBackground
+                // Its own icon and colours (Icon & Colour…).
+                readonly property var look: modelData.look || {}
+                property alias iconItem: rowIcon
+                property alias titleItem: rowTitle
+                property alias tintItem: rowTint
+                Rectangle { id: rowTint; anchors.fill: parent; color: r.look.row_color || "transparent" }
+                TapHandler { acceptedButtons: Qt.RightButton; onTapped: rowMenu.popup() }
+                Menu {
+                    id: rowMenu
+                    MenuItem { text: qsTr("Open in Editor"); onTriggered: ov.openRequested(r.modelData.id) }
+                    MenuItem { text: qsTr("Icon && Colour…"); onTriggered: ov.lookRequested([r.modelData.id]) }
+                }
                 RowLayout {
                     // A folder shown only because something inside it matches.
                     opacity: r.modelData.context ? 0.5 : 1
@@ -284,9 +305,10 @@ Rectangle {
                             horizontalAlignment: Text.AlignHCenter
                             MouseArea { anchors.fill: parent; enabled: r.modelData.child_count > 0 && !ov.filtering; cursorShape: Qt.PointingHandCursor; onClicked: ov.toggle(r.modelData.id) }
                         }
-                        KindIcon { kind: r.modelData.kind }
+                        KindIcon { id: rowIcon; kind: r.modelData.kind; icon: r.look.icon || ""; tint: r.look.icon_color || "" }
                         Label {
-                            text: r.modelData.title; color: Theme.outlinerText; elide: Text.ElideRight; Layout.fillWidth: true
+                            id: rowTitle
+                            text: r.modelData.title; color: r.look.text_color || Theme.outlinerText; elide: Text.ElideRight; Layout.fillWidth: true
                             font.bold: r.modelData.kind === "folder"
                             MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onDoubleClicked: ov.openRequested(r.modelData.id) }
                         }

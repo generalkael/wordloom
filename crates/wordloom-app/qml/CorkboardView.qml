@@ -41,6 +41,14 @@ Rectangle {
     readonly property real cardHeight: cardWidth * 0.66
     signal openRequested(string id)
     signal selectRequested(string id)
+    // Icon & Colour… for these cards (Workspace opens the binder's dialog).
+    signal lookRequested(var ids)
+    // The cards Icon & Colour… changes when opened on `id`: the picked
+    // ones if `id` is among them, else just `id` (notes have their own colours).
+    function lookIds(id) {
+        const many = picked.length > 1 && picked.indexOf(id) >= 0;
+        return many ? picked.filter(p => cards.some(c => c.id === p)) : [id];
+    }
 
     // ---- colours ----
     // A colour value from the core: "#rrggbb", "cork" (the theme's) or null.
@@ -806,6 +814,11 @@ Rectangle {
         readonly property bool isNote: !!modelData.note
         readonly property bool moving: dragger.active
         readonly property alias textEditor: synopsis
+        // A card's own icon and colours (Icon & Colour…).
+        readonly property var look: !isNote && modelData.look ? modelData.look : ({})
+        property alias cardIcon: cardKindIcon
+        property alias cardTitle: titleEdit
+        property alias cardTint: cardTintRect
         color: isNote ? cb.noteColor(modelData.color) : Theme.card
         radius: 3
         border.width: !isNote && modelData.id === cb.nodeId ? 2 : 1
@@ -822,6 +835,13 @@ Rectangle {
             z: -1
             radius: 4
             color: Qt.rgba(0, 0, 0, 0.25)
+        }
+        // The card's own background colour, over the card.
+        Rectangle {
+            id: cardTintRect
+            anchors.fill: parent
+            radius: parent.radius
+            color: face.look.row_color || "transparent"
         }
         // Label colour strip (cards), or a pin (notes)
         Rectangle {
@@ -850,14 +870,14 @@ Rectangle {
             spacing: 2
             RowLayout {
                 Layout.fillWidth: true
-                KindIcon { visible: !face.isNote; kind: face.modelData.kind || ""; size: 14 }
+                KindIcon { id: cardKindIcon; visible: !face.isNote; kind: face.modelData.kind || ""; size: 14; icon: face.look.icon || ""; tint: face.look.icon_color || "" }
                 TextField {
                     id: titleEdit
                     Layout.fillWidth: true
                     text: face.modelData.title
                     placeholderText: face.isNote ? qsTr("Note") : ""
                     font.bold: true
-                    color: Theme.cardText
+                    color: face.look.text_color || Theme.cardText
                     background: null
                     padding: 0
                     selectByMouse: true
@@ -1026,6 +1046,7 @@ Rectangle {
             MenuItem { text: qsTr("Move Earlier"); onTriggered: Api.call("shift", face.modelData.id, -1) }
             MenuItem { text: qsTr("Move Later"); onTriggered: Api.call("shift", face.modelData.id, 1) }
             MenuItem { text: qsTr("Duplicate"); onTriggered: Api.call("duplicate", face.modelData.id) }
+            MenuItem { text: qsTr("Icon && Colour…"); onTriggered: cb.lookRequested(cb.lookIds(face.modelData.id)) }
             MenuItem { text: face.modelData.include_in_compile ? qsTr("Exclude from Compile") : qsTr("Include in Compile"); onTriggered: Api.call("setField", face.modelData.id, "include_in_compile", !face.modelData.include_in_compile) }
             MenuSeparator {}
             MenuItem { text: qsTr("Move to Trash"); onTriggered: Api.call("trash", face.modelData.id) }

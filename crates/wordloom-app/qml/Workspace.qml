@@ -462,6 +462,7 @@ Item {
                         active: ws.viewMode === "corkboard"
                         onOpenRequested: (id) => ws.select(id, "editor")
                         onSelectRequested: (id) => ws.select(id, "corkboard")
+                        onLookRequested: (ids) => binder.editLook(ids)
                     }
                     OutlinerView {
                         id: outliner
@@ -469,6 +470,7 @@ Item {
                         node: ws.current
                         active: ws.viewMode === "outliner"
                         onOpenRequested: (id) => ws.select(id, "editor")
+                        onLookRequested: (ids) => binder.editLook(ids)
                     }
                     GanttView {
                         id: gantt

@@ -1215,6 +1215,17 @@ mod tests {
             "the binder rows carry them"
         );
         assert!(on_disk().contains("#4d5a9e5a"), "colours are saved at once");
+        let kids = ok(&app.call("children", &json!([ms]).to_string()));
+        let card = kids
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|k| k["id"] == folder)
+            .unwrap();
+        assert_eq!(
+            card["look"]["icon"], "star",
+            "so do the corkboard and outliner"
+        );
         assert_eq!(app.undo_redo().0.as_deref(), Some("Change Background"));
 
         // Bad values are refused and change nothing.

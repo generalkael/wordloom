@@ -9,7 +9,8 @@ Notable changes to Wordloom. Each entry lands in the same commit as the change i
   *Icon & Colour…* to give it one of 30 icons, colour the icon (a red folder, a green check),
   and colour its title and its row's background, from ten colours or any with *Custom…*.
   Changes apply and are saved at once, each is an undo step, and *Reset All* goes back to the
-  usual look. Favourites show them too.
+  usual look. Favourites, corkboard cards and outliner rows show them too, and a card's or an
+  outliner row's right-click menu has *Icon & Colour…* as well.
 - **Custom colours.** Preferences ▸ Colours changes the colour of text, backgrounds, borders,
   highlights and the selection: for the whole interface, and separately for the binder, Details,
   editor, corkboard and outliner. An area follows the interface's colours until you give it its

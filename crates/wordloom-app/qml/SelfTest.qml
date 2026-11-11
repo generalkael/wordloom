@@ -1076,6 +1076,38 @@ Item {
             check(Object.keys(Api.get("nodeInfo", null, id).look).length === 0, "and so for one item");
             ld.close();
         }],
+        ["icon and colour on cards and rows", () => {
+            Api.call("setField", rowId("Arrival"), "look", JSON.stringify({ icon: "heart", icon_color: "#d1609a", text_color: "#d64545", row_color: "#4d4a7fc7" }));
+            ws().select(rowId("The Storm"), "corkboard");
+        }],
+        ["icon and colour on cards and rows", () => {
+            const cb = ws().corkboardRef(), f = cb.cardItem(rowId("Arrival"));
+            check(f && f.cardIcon.custom && f.cardIcon.status === Image.Ready && Qt.colorEqual(f.cardTitle.color, "#d64545") && Qt.colorEqual(f.cardTint.color, "#4d4a7fc7"),
+                "a corkboard card shows the item's icon and colours" + (f ? " (" + f.cardTitle.color + " " + f.cardTint.color + ")" : " (no card)"));
+            const other = cb.cardItem(rowId("The Keeper"));
+            check(other && !other.cardIcon.custom && Qt.colorEqual(other.cardTint.color, "transparent"), "and the others look as usual");
+            check(JSON.stringify(cb.lookIds(rowId("Arrival"))) === JSON.stringify([rowId("Arrival")]), "Icon & Colour… on a card is for that card");
+            cb.lookRequested([rowId("The Keeper")]);
+            const ld = ws().binderRef().lookDialogRef();
+            check(ld.visible && ld.ids.length === 1 && ld.node.title === "The Keeper", "and opens the same dialog as the binder");
+            ld.set("text_color", "#5a9e5a");
+            check(Qt.colorEqual(cb.cardItem(rowId("The Keeper")).cardTitle.color, "#5a9e5a"), "a change shows on the card at once");
+            ld.close();
+            ws().select(rowId("The Storm"), "outliner");
+        }],
+        ["icon and colour on cards and rows", () => {
+            const ov = ws().outlinerRef(), r = ov.rowItem(rowId("Arrival"));
+            check(r && r.iconItem.custom && r.iconItem.status === Image.Ready && Qt.colorEqual(r.titleItem.color, "#d64545") && Qt.colorEqual(r.tintItem.color, "#4d4a7fc7"),
+                "an outliner row shows them too" + (r ? " (" + r.titleItem.color + ")" : " (no row)"));
+            ov.lookRequested([rowId("Arrival")]);
+            const ld = ws().binderRef().lookDialogRef();
+            check(ld.visible && ld.node.title === "Arrival", "and its right-click menu opens the dialog");
+            ld.resetAll();
+            ld.close();
+            Api.call("setField", rowId("The Keeper"), "look", "{}");
+            const r2 = ov.rowItem(rowId("Arrival"));
+            check(r2 && !r2.iconItem.custom && Qt.colorEqual(r2.tintItem.color, "transparent"), "Reset All puts the row back");
+        }],
         ["sprint", () => {
             ws().select(rowId("Arrival"), "editor");
             sprint.durationMin = 1; sprint.goal = 3; sprint.start();

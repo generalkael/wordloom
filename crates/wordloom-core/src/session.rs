@@ -492,6 +492,7 @@ impl Session {
                     "include_in_compile": cn.include_in_compile,
                     "keywords": cn.keywords,
                     "fields": cn.fields,
+                    "look": cn.look,
                 })
             })
             .collect();
