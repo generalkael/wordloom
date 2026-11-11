@@ -154,7 +154,9 @@ Every push to `main` builds two packages. Download them from the artifacts of th
 [CI run](https://github.com/generalkael/wordloom/actions/workflows/ci.yml).
 
 **AppImage:** a single file that runs on most distributions from Ubuntu 22.04 on. It bundles Qt,
-including the PDF viewer and Wayland and X11 support.
+including the PDF viewer and Wayland and X11 support. It asks the desktop (through
+xdg-desktop-portal) whether it's in light or dark mode; set `QT_QPA_PLATFORMTHEME` to use another
+Qt platform theme.
 
 ```sh
 chmod +x Wordloom-x86_64.AppImage

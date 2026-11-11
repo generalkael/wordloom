@@ -198,8 +198,11 @@ QtObject {
     property string projectsFolder: ""
     readonly property string defaultProjectsFolder: StandardPaths.writableLocation(StandardPaths.DocumentsLocation).toString() + "/Wordloom"
     readonly property string newProjectsFolder: projectsFolder || defaultProjectsFolder
+    // "General", capitalised: Qt's .ini files keep this group as
+    // [%General] and read it back only under that spelling, so "general"
+    // was saved but never loaded.
     property Settings general: SavedSettings {
-        category: "general"
+        category: "General"
         property alias reopenLast: theme.reopenLast
         property alias autosaveSeconds: theme.autosaveSeconds
         property alias projectsFolder: theme.projectsFolder

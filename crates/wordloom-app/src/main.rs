@@ -17,6 +17,16 @@ fn main() {
             std::env::set_var("QT_SCALE_FACTOR", scale.to_string());
         }
     }
+    // The AppImage carries its own Qt without the desktop's theme plugins
+    // (KDE's, GNOME's), so Qt can't tell the system is in dark mode and
+    // Wordloom would start light, hiding colours chosen for the dark theme.
+    // The bundled xdg-desktop-portal theme asks the desktop instead.
+    if std::env::var_os("APPIMAGE").is_some()
+        && std::env::var_os("QT_QPA_PLATFORMTHEME").is_none()
+        && std::env::var("QT_QPA_PLATFORM").map_or(true, |p| p != "offscreen")
+    {
+        std::env::set_var("QT_QPA_PLATFORMTHEME", "xdgdesktopportal");
+    }
     let mut app = QGuiApplication::new();
     if let Some(mut app) = app.as_mut() {
         app.as_mut()

@@ -201,7 +201,8 @@ Item {
             const keys = (o) => o.savedKeys().slice().sort().join(",");
             check(Theme.prefs.savedKeys().indexOf("uiFont") >= 0 && Theme.prefs.savedKeys().indexOf("lineHighlightColor") >= 0
                 && Theme.prefs.savedKeys().indexOf("savedKeys") < 0, "appearance preferences are written as they change (" + Theme.prefs.savedKeys().length + ")");
-            check(keys(Theme.general) === "autosaveSeconds,projectsFolder,reopenLast", "so are the general ones (" + keys(Theme.general) + ")");
+            check(keys(Theme.general) === "autosaveSeconds,projectsFolder,reopenLast" && Theme.general.category === "General",
+                "so are the general ones, in a group Qt reads back (" + keys(Theme.general) + ", " + Theme.general.category + ")");
             check(keys(Shortcuts.saved) === "custom", "and keyboard shortcuts (" + keys(Shortcuts.saved) + ")");
         }],
         ["custom colours", () => {

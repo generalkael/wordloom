@@ -229,6 +229,12 @@ Notable changes to Wordloom. Each entry lands in the same commit as the change i
   `Cargo.lock`), as Flathub requires, and the AppStream metadata has screenshots.
 
 ### Fixed
+- **Preferences ▸ General kept for the next start.** *Reopen the last project*, the autosave
+  interval and the new-projects folder were written to disk but never read back, so they reverted
+  each time Wordloom started.
+- **The AppImage follows the desktop's dark mode.** It couldn't tell KDE (and other desktops)
+  were dark, so it always started light, and colours you'd chosen for the dark theme in
+  Preferences ▸ Colours seemed to be lost. It now asks the desktop through xdg-desktop-portal.
 - Dropping a card into a folder on a freeform corkboard, and switching a board between grid and
   freeform, no longer print errors (the dropped card's handler ran on after the card had gone).
 - No more "binding loop" warnings on Qt 6.8. They came from the editor's page while a project
