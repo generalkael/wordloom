@@ -1053,6 +1053,14 @@ Item {
         ["icon and colour", () => {
             const st = ws().binderRef().lookDialogRef().iconStates();
             check(st.ready === Icons.choices.length + 1 && st.bad.length === 0, "every icon on offer shows in the chosen colour (" + st.ready + " ready; " + st.bad.join(" ") + ")");
+            const ld = ws().binderRef().lookDialogRef();
+            check(ld.fits() && ld.x >= 0 && ld.x + ld.width <= win.width, "everything fits inside the dialog (" + Math.round(ld.width) + " wide)");
+            Theme.uiFontSize = 16;
+        }],
+        ["icon and colour", () => {
+            const ld = ws().binderRef().lookDialogRef();
+            check(ld.fits() && ld.x >= 0 && ld.x + ld.width <= win.width && ld.height <= win.height, "and with a large interface font (" + Math.round(ld.width) + "×" + Math.round(ld.height) + ")");
+            Theme.resetUiFont();
         }],
         ["icon and colour", () => {
             const b = ws().binderRef(), id = rowId("The Storm"), ld = b.lookDialogRef(), r = b.rowItem(id);

@@ -108,104 +108,120 @@ Dialog {
         }
     }
 
-    ColumnLayout {
-        width: Math.min(Theme.px(470), ld.parent ? ld.parent.width - 60 : Theme.px(470))
-        spacing: 6
+    // An explicit size: sized by its content, the dialog came out narrower
+    // than the content laid itself out at, cutting off the right edge. The
+    // content follows the dialog's width and scrolls if the window is short.
+    width: Math.min(Theme.px(500), parent ? parent.width - 40 : Theme.px(500))
+    height: Math.min(implicitHeight, parent ? parent.height - 40 : implicitHeight)
 
-        // How the (first) item looks in the binder now.
-        Rectangle {
-            Layout.fillWidth: true
-            Layout.preferredHeight: Theme.px(34)
-            radius: 4
-            color: Theme.binderBackground
-            border.color: Theme.border
+    // Whether everything fits across the dialog (the self-test).
+    function fits() { return content.width <= ld.availableWidth + 0.5 && content.childrenRect.width <= content.width + 0.5; }
+
+    ScrollView {
+        id: scroller
+        anchors.fill: parent
+        contentWidth: availableWidth
+        clip: true
+        ColumnLayout {
+            id: content
+            width: scroller.availableWidth
+            spacing: 6
+
+            // How the (first) item looks in the binder now.
             Rectangle {
-                anchors.fill: parent
-                anchors.margins: 3
+                Layout.fillWidth: true
+                Layout.preferredHeight: Theme.px(34)
                 radius: 4
-                color: ld.look.row_color || "transparent"
-            }
-            RowLayout {
-                anchors.fill: parent
-                anchors.leftMargin: 12
-                anchors.rightMargin: 12
-                spacing: 6
-                KindIcon {
-                    kind: ld.node ? ld.node.kind : ""
-                    role: ld.node && ld.node.is_root ? (ld.node.role || "") : ""
-                    icon: ld.look.icon || ""
-                    tint: ld.look.icon_color || ""
+                color: Theme.binderBackground
+                border.color: Theme.border
+                Rectangle {
+                    anchors.fill: parent
+                    anchors.margins: 3
+                    radius: 4
+                    color: ld.look.row_color || "transparent"
                 }
-                Label {
-                    Layout.fillWidth: true
-                    text: ld.node ? ld.node.title : ""
-                    color: ld.look.text_color || Theme.binderText
-                    elide: Text.ElideRight
-                }
-                Label {
-                    visible: ld.ids.length > 1
-                    text: qsTr("and %1 more").arg(ld.ids.length - 1)
-                    color: Theme.binderSubtext
-                }
-            }
-        }
-
-        Heading { text: qsTr("Icon") }
-        Flow {
-            Layout.fillWidth: true
-            spacing: 3
-            Repeater {
-                id: iconRep
-                model: [""].concat(Icons.choices)
-                delegate: Rectangle {
-                    id: cell
-                    required property string modelData
-                    readonly property bool chosen: (ld.look.icon || "") === modelData
-                    objectName: "icon-" + (modelData || "default")
-                    width: Theme.px(30); height: Theme.px(30); radius: 4
-                    color: chosen ? Theme.binderSelection : (cellHover.hovered ? Qt.rgba(0.5, 0.5, 0.5, 0.15) : "transparent")
-                    border.color: chosen ? Theme.accent : "transparent"
-                    property alias image: cellIcon
+                RowLayout {
+                    anchors.fill: parent
+                    anchors.leftMargin: 12
+                    anchors.rightMargin: 12
+                    spacing: 6
                     KindIcon {
-                        id: cellIcon
-                        anchors.centerIn: parent
-                        size: Theme.px(18)
                         kind: ld.node ? ld.node.kind : ""
                         role: ld.node && ld.node.is_root ? (ld.node.role || "") : ""
-                        icon: cell.modelData
+                        icon: ld.look.icon || ""
                         tint: ld.look.icon_color || ""
                     }
-                    HoverHandler { id: cellHover; cursorShape: Qt.PointingHandCursor }
-                    ToolTip.visible: cellHover.hovered
-                    ToolTip.text: cell.modelData ? Icons.set[cell.modelData].name : qsTr("The usual icon for this kind of item")
-                    TapHandler { onTapped: ld.set("icon", cell.modelData) }
+                    Label {
+                        Layout.fillWidth: true
+                        text: ld.node ? ld.node.title : ""
+                        color: ld.look.text_color || Theme.binderText
+                        elide: Text.ElideRight
+                    }
+                    Label {
+                        visible: ld.ids.length > 1
+                        text: qsTr("and %1 more").arg(ld.ids.length - 1)
+                        color: Theme.binderSubtext
+                    }
                 }
             }
-        }
 
-        Heading { text: qsTr("Icon colour") }
-        SwatchRow { field: "icon_color"; defaultText: qsTr("Own colours") }
-
-        Heading { text: qsTr("Title colour") }
-        SwatchRow { field: "text_color" }
-
-        Heading { text: qsTr("Background") }
-        SwatchRow { field: "row_color"; defaultText: qsTr("None"); translucent: true }
-
-        RowLayout {
-            Layout.fillWidth: true
-            Layout.topMargin: 6
-            Label {
+            Heading { text: qsTr("Icon") }
+            Flow {
                 Layout.fillWidth: true
-                wrapMode: Text.Wrap
-                color: Theme.subtext
-                font.pixelSize: Theme.px(12)
-                text: qsTr("Changes apply at once; Edit ▸ Undo takes them back one at a time.")
+                spacing: 3
+                Repeater {
+                    id: iconRep
+                    model: [""].concat(Icons.choices)
+                    delegate: Rectangle {
+                        id: cell
+                        required property string modelData
+                        readonly property bool chosen: (ld.look.icon || "") === modelData
+                        objectName: "icon-" + (modelData || "default")
+                        width: Theme.px(30); height: Theme.px(30); radius: 4
+                        color: chosen ? Theme.binderSelection : (cellHover.hovered ? Qt.rgba(0.5, 0.5, 0.5, 0.15) : "transparent")
+                        border.color: chosen ? Theme.accent : "transparent"
+                        property alias image: cellIcon
+                        KindIcon {
+                            id: cellIcon
+                            anchors.centerIn: parent
+                            size: Theme.px(18)
+                            kind: ld.node ? ld.node.kind : ""
+                            role: ld.node && ld.node.is_root ? (ld.node.role || "") : ""
+                            icon: cell.modelData
+                            tint: ld.look.icon_color || ""
+                        }
+                        HoverHandler { id: cellHover; cursorShape: Qt.PointingHandCursor }
+                        ToolTip.visible: cellHover.hovered
+                        ToolTip.text: cell.modelData ? Icons.set[cell.modelData].name : qsTr("The usual icon for this kind of item")
+                        TapHandler { onTapped: ld.set("icon", cell.modelData) }
+                    }
+                }
             }
-            Button {
-                text: qsTr("Reset All")
-                enabled: Object.keys(ld.look).length > 0 || ld.ids.length > 1
-                onClicked: ld.resetAll()
+
+            Heading { text: qsTr("Icon colour") }
+            SwatchRow { field: "icon_color"; defaultText: qsTr("Own colours") }
+
+            Heading { text: qsTr("Title colour") }
+            SwatchRow { field: "text_color" }
+
+            Heading { text: qsTr("Background") }
+            SwatchRow { field: "row_color"; defaultText: qsTr("None"); translucent: true }
+
+            RowLayout {
+                Layout.fillWidth: true
+                Layout.topMargin: 6
+                Label {
+                    Layout.fillWidth: true
+                    wrapMode: Text.Wrap
+                    color: Theme.subtext
+                    font.pixelSize: Theme.px(12)
+                    text: qsTr("Changes apply at once; Edit ▸ Undo takes them back one at a time.")
+                }
+                Button {
+                    text: qsTr("Reset All")
+                    enabled: Object.keys(ld.look).length > 0 || ld.ids.length > 1
+                    onClicked: ld.resetAll()
+                }
             }
         }
     }
