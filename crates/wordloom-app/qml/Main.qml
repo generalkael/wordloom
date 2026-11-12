@@ -772,7 +772,7 @@ ApplicationWindow {
         win: win
         autoBackup: autoBackup
         anchors.centerIn: parent
-        width: Math.min(820, win.width - 32)
+        width: Math.min(900, win.width - 32)
         height: Math.min(600, win.height - 32)
     }
     // File ▸ Import Manuscript…: a whole book from Word, Markdown or text,

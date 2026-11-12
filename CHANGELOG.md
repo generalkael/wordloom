@@ -272,6 +272,8 @@ Notable changes to Wordloom. Each entry lands in the same commit as the change i
   start screen and New Document once a project is open.
 
 ### Changed
+- **A roomier Preferences window.** It is a little wider, and its pages, title and Close button
+  keep a margin from the border, so no button sits against the edge or under the scroll bar.
 - **Preferences and colours are saved the moment you change them.** Preferences used to be
   written a little later (at the latest when Wordloom quit), and colours waited for autosave, so a
   crash or a forced quit could lose them. A colour change (labels, corkboards, notes, timeline

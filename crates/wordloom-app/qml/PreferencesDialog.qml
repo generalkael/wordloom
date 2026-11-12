@@ -13,6 +13,15 @@ Dialog {
     title: qsTr("Preferences")
     modal: false
     standardButtons: Dialog.Close
+    // Room between the border and the pages, the title and Close (Fusion's
+    // own 6 px left buttons right against the edge).
+    padding: 16
+    topPadding: 8
+    Binding { target: pd.header; property: "leftPadding"; value: 16 }
+    Binding { target: pd.header; property: "topPadding"; value: 12 }
+    Binding { target: pd.footer; property: "leftPadding"; value: 16 }
+    Binding { target: pd.footer; property: "rightPadding"; value: 16 }
+    Binding { target: pd.footer; property: "bottomPadding"; value: 14 }
 
     property var win                      // Main.qml's window (setSpellLanguage)
     property var autoBackup               // Main.qml's automatic backups
@@ -285,6 +294,7 @@ Dialog {
             // ---------------- General ----------------
             ScrollView {
                 contentWidth: availableWidth
+                rightPadding: 14   // the scroll bar runs here, clear of the buttons
                 ColumnLayout {
                     width: parent.width
                     spacing: 8
@@ -350,6 +360,7 @@ Dialog {
             // ---------------- Interface ----------------
             ScrollView {
                 contentWidth: availableWidth
+                rightPadding: 14   // the scroll bar runs here, clear of the buttons
                 ColumnLayout {
                     width: parent.width
                     spacing: 10
@@ -425,6 +436,7 @@ Dialog {
             ScrollView {
                 id: coloursPage
                 contentWidth: availableWidth
+                rightPadding: 14   // the scroll bar runs here, clear of the buttons
                 ColumnLayout {
                     width: parent.width
                     spacing: 8
@@ -521,6 +533,7 @@ Dialog {
             // ---------------- Font & Spacing ----------------
             ScrollView {
                 contentWidth: availableWidth
+                rightPadding: 14   // the scroll bar runs here, clear of the buttons
                 ColumnLayout {
                     width: parent.width
                     spacing: 10
@@ -634,6 +647,7 @@ Dialog {
             // ---------------- Editor ----------------
             ScrollView {
                 contentWidth: availableWidth
+                rightPadding: 14   // the scroll bar runs here, clear of the buttons
                 ColumnLayout {
                     width: parent.width
                     spacing: 8
@@ -696,6 +710,7 @@ Dialog {
             // ---------------- Spelling & Typing ----------------
             ScrollView {
                 contentWidth: availableWidth
+                rightPadding: 14   // the scroll bar runs here, clear of the buttons
                 ColumnLayout {
                     width: parent.width
                     spacing: 8
@@ -792,6 +807,7 @@ Dialog {
             // ---------------- Corkboard ----------------
             ScrollView {
                 contentWidth: availableWidth
+                rightPadding: 14   // the scroll bar runs here, clear of the buttons
                 ColumnLayout {
                     width: parent.width
                     spacing: 8
@@ -821,6 +837,7 @@ Dialog {
             // ---------------- Backups ----------------
             ScrollView {
                 contentWidth: availableWidth
+                rightPadding: 14   // the scroll bar runs here, clear of the buttons
                 ColumnLayout {
                     width: parent.width
                     spacing: 8
